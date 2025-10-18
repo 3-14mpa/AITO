@@ -1,0 +1,8 @@
+# config_aito.yaml
+
+project_id: "aito-475518" # FONTOS: Ennek kell lennie a GCP projekt nevének!
+firestore_collection_name: "aito_memory" # Régi érték, a biztonság kedvéért frissítjük
+docs_firestore_collection_name: "aito_documents" # Régi érték, a biztonság kedvéért frissítjük
+# ... egyéb beállítások ...
+session_id: "aito_shared_log"
+credentials_file: "aito-475518-808b248f7769.json" # A MEGLÉVŐ hitelesítő fájl neve
