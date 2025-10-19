@@ -44,7 +44,7 @@ os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = CONFIG.get('credentials_file', ''
 import sqlite3
 from langchain_google_vertexai import VertexAIEmbeddings
 from langchain_community.vectorstores import Chroma
-from langchain_community.chat_message_histories import SQLiteChatMessageHistory
+from langchain_community.chat_message_histories.sql import SQLChatMessageHistory
 
 try:
     # === HELYI ADATBÁZIS FÁJLOK ÉS MAPPÁK ===
