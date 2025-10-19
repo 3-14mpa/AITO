@@ -127,7 +127,7 @@ def main(page: ft.Page):
     print(f"{time.monotonic():.4f}: --- STARTING INITIALIZATION ---")
 
     print(f"{time.monotonic():.4f}: Checking critical components...")
-    if not all([ATOM_DATA, PROMPTS, CONFIG, vector_store, docs_vector_store]):
+    if not all(comp is not None for comp in [ATOM_DATA, PROMPTS, CONFIG, vector_store, docs_vector_store]):
         page.add(ft.Text("Hiba: Az alkalmazás kritikus komponenseinek betöltése sikertelen!", color=ft.Colors.RED))
         return
     print(f"{time.monotonic():.4f}: Critical components OK.")
