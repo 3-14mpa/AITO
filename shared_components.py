@@ -5,7 +5,7 @@ import os
 import graphviz
 from collections import Counter
 from datetime import datetime, timezone
-from langchain_text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.vectorstores import VectorStore
