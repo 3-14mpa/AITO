@@ -75,7 +75,7 @@ try:
     print(f"Dokumentum-vektorok sikeresen csatlakoztatva: {CHROMA_DOCS_PATH}")
 
     # === LOKÁLIS BESZÉLGETÉS NAPLÓ (SQLITE) ===
-    firestore_history = SQLiteChatMessageHistory(
+    firestore_history = SQLChatMessageHistory(
         session_id=CONFIG['session_id'],
         db_path=SQLITE_HISTORY_FILE
     )
