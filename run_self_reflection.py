@@ -38,6 +38,7 @@ def run_cycle():
         return
 
     connection_string = f"sqlite:///{SQLITE_HISTORY_FILE}"
+    # Ellenőrizve: Az SQLChatMessageHistory a 'connection_string' paramétert használja, ami a langchain-community verzióban a helyes.
     sql_history = SQLChatMessageHistory(
         session_id=SESSION_ID,
         connection=connection_string

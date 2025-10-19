@@ -78,7 +78,7 @@ try:
     connection_string = f"sqlite:///{SQLITE_HISTORY_FILE}"
     firestore_history = SQLChatMessageHistory( # Helyes osztálynév
         session_id=CONFIG['session_id'],
-        connection=connection_string # Helyes paraméternév
+        connection_string=connection_string # Helyes paraméternév
     )
     print(f"Beszélgetés-napló sikeresen csatlakoztatva: {SQLITE_HISTORY_FILE}")
     # Próbáljuk meg itt is hibakezeléssel olvasni a kezdeti üzeneteket
