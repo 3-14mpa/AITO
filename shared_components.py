@@ -83,7 +83,7 @@ def search_memory_tool(query: str, config: dict, vector_store: VectorStore) -> s
         connection_string = f"sqlite:///{SQLITE_HISTORY_FILE}"
         history = SQLChatMessageHistory(
             session_id=most_common_session_id,
-            connection_string=connection_string
+            connection=connection_string
         )
         
         full_conversation_messages = history.messages

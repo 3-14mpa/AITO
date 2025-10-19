@@ -41,7 +41,7 @@ def run_cycle():
     # Ellenőrizve: Az SQLChatMessageHistory a 'connection_string' paramétert használja, ami a langchain-community verzióban a helyes.
     sql_history = SQLChatMessageHistory(
         session_id=SESSION_ID,
-        connection_string=connection_string
+        connection=connection_string
     )
 
     # 1. LÉPÉS: Napi kontextus létrehozása a data_handler segítségével
