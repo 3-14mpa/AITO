@@ -40,7 +40,7 @@ def run_cycle():
     connection_string = f"sqlite:///{SQLITE_HISTORY_FILE}"
     sql_history = SQLChatMessageHistory(
         session_id=SESSION_ID,
-        connection_string=connection_string
+        connection=connection_string
     )
 
     # 1. LÉPÉS: Napi kontextus létrehozása a data_handler segítségével

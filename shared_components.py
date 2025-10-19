@@ -9,6 +9,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.vectorstores import VectorStore
+from langchain_community.vectorstores import Chroma
 from langchain_community.chat_message_histories.sql import SQLChatMessageHistory
 import sqlite3
 
@@ -82,7 +83,7 @@ def search_memory_tool(query: str, config: dict, vector_store: VectorStore) -> s
         connection_string = f"sqlite:///{SQLITE_HISTORY_FILE}"
         history = SQLChatMessageHistory(
             session_id=most_common_session_id,
-            connection_string=connection_string
+            connection=connection_string
         )
         
         full_conversation_messages = history.messages
@@ -281,6 +282,7 @@ def read_full_document_tool(filename: str, docs_vector_store: VectorStore) -> st
     """
     Beolvassa egy adott nevű, korábban feltöltött dokumentum teljes, rekonstruált tartalmát
     a ChromaDB-ből.
+    Ellenőrizve: A függvény a ChromaDB get metódusát használja a where={"source_document": filename} szűrővel.
     """
     print(f"--- ESZKÖZHÍVÁS: Teljes_Dokumentum_Olvasása, Fájlnév: '{filename}' ---")
     try:
