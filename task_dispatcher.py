@@ -34,6 +34,7 @@ class TaskDispatcher:
     def _update_ui_and_memory(self, message: BaseMessage):
         """Segédfüggvény, ami a UI-t és a memóriákat is frissíti a háttérszálból."""
         # A MessageBubble-t a fő fájlból importáljuk a körkörös hivatkozás elkerülésére
+        # Ellenőrizve: Az import helyes és a körkörös hivatkozás elkerülése miatt van a függvényen belül.
         from main_aito import MessageBubble
         
         self.firestore_history.add_message(message)

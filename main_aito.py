@@ -6,11 +6,14 @@ import threading
 import time
 import yaml
 import logging
+import sqlite3
 from datetime import datetime, timezone
 
 # --- LangChain Importok ---
-from langchain_google_vertexai import ChatVertexAI, HarmCategory, HarmBlockThreshold, VertexAIEmbeddings
-from langchain_google_vertexai.vectorstores import VectorSearchVectorStore
+from langchain_google_vertexai import ChatVertexAI, HarmCategory, HarmBlockThreshold, VertexAIEmbeddings # Google Embedding
+from langchain_community.vectorstores import Chroma # Helyi Vektor DB
+from langchain_community.chat_message_histories.sql import SQLChatMessageHistory # Helyi Napló DB
+from langchain_text_splitters import RecursiveCharacterTextSplitter # Helyes import
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
@@ -41,11 +44,6 @@ os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = CONFIG.get('credentials_file', ''
 
 
 # --- Lokális Memória és Adatbázis Inicializálása (ChromaDB + SQLite) ---
-import sqlite3
-from langchain_google_vertexai import VertexAIEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain_community.chat_message_histories.sql import SQLChatMessageHistory
-
 try:
     # === HELYI ADATBÁZIS FÁJLOK ÉS MAPPÁK ===
     LOCAL_DB_PATH = "./aito_local_data"
@@ -58,7 +56,8 @@ try:
     print("Google Cloud embedding kliens inicializálása...")
     google_embeddings = VertexAIEmbeddings(
         model_name="text-embedding-004",
-        project=CONFIG['project_id']
+        project=CONFIG['project_id'],
+        # Itt már nincs szükség location-re az embeddinghez az újabb verziókban
     )
     print("Embedding kliens inicializálva.")
 
@@ -75,15 +74,26 @@ try:
     print(f"Dokumentum-vektorok sikeresen csatlakoztatva: {CHROMA_DOCS_PATH}")
 
     # === LOKÁLIS BESZÉLGETÉS NAPLÓ (SQLITE) ===
-    firestore_history = SQLChatMessageHistory(
+    # Helyes connection string formátum SQLite-hoz
+    connection_string = f"sqlite:///{SQLITE_HISTORY_FILE}"
+    firestore_history = SQLChatMessageHistory( # Helyes osztálynév
         session_id=CONFIG['session_id'],
-        db_path=SQLITE_HISTORY_FILE
+        connection=connection_string # Helyes paraméternév
     )
     print(f"Beszélgetés-napló sikeresen csatlakoztatva: {SQLITE_HISTORY_FILE}")
-    print(f"{len(firestore_history.messages)} üzenet betöltve a helyi adatbázisból.")
+    # Próbáljuk meg itt is hibakezeléssel olvasni a kezdeti üzeneteket
+    try:
+        initial_messages = firestore_history.messages
+        print(f"{len(initial_messages)} üzenet betöltve a helyi adatbázisból.")
+    except Exception as hist_err:
+        print(f"Figyelmeztetés: Nem sikerült betölteni az előzményeket az adatbázisból: {hist_err}")
+        print("Lehet, hogy az adatbázis még üres vagy a séma nem megfelelő.")
+
 
 except Exception as e:
-    print(f"HIBA a lokális komponensek inicializálása közben: {e}")
+    print(f"!!! KRITIKUS HIBA az inicializálás közben: {e} !!!")
+    import traceback
+    traceback.print_exc() # Részletes hiba kiírása
     google_embeddings = None
     vector_store = None
     docs_vector_store = None
@@ -127,7 +137,7 @@ def main(page: ft.Page):
     print(f"{time.monotonic():.4f}: --- STARTING INITIALIZATION ---")
 
     print(f"{time.monotonic():.4f}: Checking critical components...")
-    if not all(comp is not None for comp in [ATOM_DATA, PROMPTS, CONFIG, vector_store, docs_vector_store]):
+    if not all(comp is not None for comp in [ATOM_DATA, PROMPTS, CONFIG, vector_store, docs_vector_store, firestore_history]): # <-- FIGYELEM: firestore_history is hozzáadva!
         page.add(ft.Text("Hiba: Az alkalmazás kritikus komponenseinek betöltése sikertelen!", color=ft.Colors.RED))
         return
     print(f"{time.monotonic():.4f}: Critical components OK.")
@@ -433,14 +443,17 @@ def get_ai_response(user_message: HumanMessage, chain_for_request, atom_id_for_r
     atom_buttons = {}
 
     def switch_atom(selected_atom_id: str):
+        logging.info(f"--- ATOM VÁLTÁS: {selected_atom_id} ---")
         app_state["active_atom_id"] = selected_atom_id
         current_atom_config = ATOM_DATA[app_state["active_atom_id"]]
+        logging.info(f"'{selected_atom_id}' konfigurációja betöltve. Modell: {current_atom_config.get('model_name')}")
 
         final_system_prompt = PROMPTS['team_simulation_template'].format(
             active_atom_role=selected_atom_id,
             personality_description=current_atom_config['personality'],
             grounding_instructions=PROMPTS['grounding_instructions']
         )
+        logging.info("System prompt sikeresen összeállítva.")
 
         llm = ChatVertexAI(
             model_name=current_atom_config["model_name"],
@@ -453,6 +466,7 @@ def get_ai_response(user_message: HumanMessage, chain_for_request, atom_id_for_r
                 HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
             }
         )
+        logging.info(f"ChatVertexAI kliens inicializálva a '{current_atom_config['model_name']}' modellel, a '{CONFIG['conversation_location']}' régióban.")
 
         # A modellnek már a becsomagolt, egyszerűsített eszközt adjuk át.
         tool_registry = {
