@@ -566,29 +566,34 @@ def get_ai_response(user_message: HumanMessage, chain_for_request, atom_id_for_r
     )
     print(f"{time.monotonic():.4f}: Page layout OK.")
 
-    # === KRITIKUS JAVÍTÁS: UI KIRAJZOLÁSA A BLOKKOLÓ HÍVÁS ELŐTT ===
-    # Azért, hogy az ablak ne maradjon üresen, amíg a motor inicializál.
+    # === JAVÍTÁS: UI KIRAJZOLÁSA A BLOKKOLÓ HÍVÁS ELŐTT ===
+    # Először kirajzoljuk az ablakot, hogy ne legyen üres.
     page.padding = 20
-    page.update() # Ez kirajzolja a gombokat, chat ablakot (üresen)
-    logging.info("Az első UI kirajzolás elküldve.")
-    # ==============================================================
+    page.update() # <-- EZ A HELYES ELSŐ HÍVÁS
+    print(f"{time.monotonic():.4f}: Első Flet UI kirajzolás (page.update) elküldve.")
+    # =======================================================
 
     # === AZ ELSŐ SWITCH_ATOM HÍVÁSA ITT, A FŐ SZÁLON ===
-    # Ez a hívás most már lefagyaszthatja a kirajzolt UI-t, de az már nem lesz üres.
+    # Most már jöhet a motor inicializálása. Az ablak már látszik,
+    # legfeljebb 1-2 másodpercig "homokórázik", de nem lesz üres.
     try:
         logging.info("Az első ATOM motorjának beállítása (fő szál)...")
-        switch_atom(INITIAL_ATOM_ID) # Ez blokkolhatja a UI-t egy kicsit
+        switch_atom(INITIAL_ATOM_ID) # Ez már a kirajzolt ablakon fut
         logging.info("Az első ATOM motorja sikeresen beállítva.")
     except Exception as e:
          logging.error(f"HIBA az első switch_atom hívásakor: {e}", exc_info=True)
-         # Ide is tehetnénk hibaüzenetet a UI-ra
+         page.add(ft.Text(f"Indítási hiba: {e}", color=ft.Colors.RED))
+         page.update() # Hiba esetén is frissítsünk
     # ======================================================
 
-    # Erre a page.update()-re itt már nincs szükség, mert a switch_atom is hív egyet
+    # Erre a második page.update()-re itt már nincs szükség,
+    # mert a switch_atom() a saját végén már meghívja.
     # page.update()
 
     # Csak az előzmények betöltését indítjuk a háttérben
     logging.info("Háttér-előzmény betöltési szál indítása...")
+    # FIGYELEM: Itt a 2. Lépéses javításomat is alkalmazom
+    # (a initialize_app_in_background thread-safe javítása)
     page.run_thread(initialize_app_in_background)
     logging.info("Háttérszál elindítva. A main függvény véget ért.")
 
