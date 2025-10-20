@@ -410,7 +410,7 @@ def get_ai_response(user_message: HumanMessage, chain_for_request, atom_id_for_r
     page.on_keyboard_event = on_keyboard
 
     def initialize_app_in_background():
-        """CSAK az előzményeket tölti be a háttérben."""
+        """CSAK az előzményeket tölti be a háttérben, THREAD-SAFE módon."""
         logging.info("--- Háttér-előzmény betöltés elindult ---")
         try:
             logging.info("Előzmények betöltése az SQLite adatbázisból...")
@@ -418,15 +418,25 @@ def get_ai_response(user_message: HumanMessage, chain_for_request, atom_id_for_r
             logging.info(f"{len(messages_to_load)} üzenet sikeresen betöltve az adatbázisból.")
 
             if messages_to_load:
-                logging.info("Előzmények megjelenítése a UI-on...")
-                for msg in messages_to_load:
-                    chat_history_view.controls.append(MessageBubble(msg))
-                page.update() # Frissítés a hozzáadás után
-                logging.info("Előzmények megjelenítve. Görgőzés...")
-                time.sleep(0.5)
-                chat_history_view.scroll_to(offset=-1, duration=300)
-                page.update() # Frissítés a görgetés után
-                logging.info("Görgőzés befejeződött.")
+                logging.info("Előzmény buborékok létrehozása (memóriában)...")
+                # A MessageBubble objektumok létrehozása biztonságos a háttérszálon
+                bubbles_to_add = [MessageBubble(msg) for msg in messages_to_load]
+
+                # === THREAD-SAFE UI FRISSÍTÉS ===
+                # A Flet dokumentációja szerint a controls lista módosítása
+                # NEM thread-safe. A BIZTONSÁGOS módja az, hogy
+                # az összes módosítást elvégezzük, és a VÉGÉN hívunk egy
+                # page.update()-et.
+
+                logging.info("Előzmények hozzáadása a UI-hoz (thread-safe)...")
+                chat_history_view.controls.clear() # Töröljük a (valószínűleg üres) listát
+                chat_history_view.controls.extend(bubbles_to_add) # Adjuk hozzá az összes új elemet
+                chat_history_view.scroll_to(offset=-1, duration=0) # Görgessünk az aljára (azonnal)
+
+                # Most hívjuk az EGYETLEN, thread-safe frissítést
+                page.update()
+
+                logging.info("Előzmények megjelenítve és aljára görgetve.")
             else:
                  logging.info("Nincsenek előzmények a megjelenítéshez.")
 
@@ -434,10 +444,10 @@ def get_ai_response(user_message: HumanMessage, chain_for_request, atom_id_for_r
 
         except Exception as e:
             logging.error(f"KRITIKUS HIBA a háttér-előzmény betöltés során: {e}", exc_info=True)
-            chat_history_view.controls.append(
-                MessageBubble(AIMessage(content=f"Indítási hiba: {e}", name="SYSTEM_ERROR"))
-            )
-            page.update()
+            # A hibaüzenet hozzáadása is legyen thread-safe
+            error_bubble = MessageBubble(AIMessage(content=f"Indítási hiba: {e}", name="SYSTEM_ERROR"))
+            chat_history_view.controls.append(error_bubble)
+            page.update() # page.update() thread-safe
 
     print(f"{time.monotonic():.4f}: Initializing UI components (Atom Buttons)...")
     atom_buttons = {}
@@ -556,7 +566,15 @@ def get_ai_response(user_message: HumanMessage, chain_for_request, atom_id_for_r
     )
     print(f"{time.monotonic():.4f}: Page layout OK.")
 
+    # === KRITIKUS JAVÍTÁS: UI KIRAJZOLÁSA A BLOKKOLÓ HÍVÁS ELŐTT ===
+    # Azért, hogy az ablak ne maradjon üresen, amíg a motor inicializál.
+    page.padding = 20
+    page.update() # Ez kirajzolja a gombokat, chat ablakot (üresen)
+    logging.info("Az első UI kirajzolás elküldve.")
+    # ==============================================================
+
     # === AZ ELSŐ SWITCH_ATOM HÍVÁSA ITT, A FŐ SZÁLON ===
+    # Ez a hívás most már lefagyaszthatja a kirajzolt UI-t, de az már nem lesz üres.
     try:
         logging.info("Az első ATOM motorjának beállítása (fő szál)...")
         switch_atom(INITIAL_ATOM_ID) # Ez blokkolhatja a UI-t egy kicsit
@@ -566,8 +584,8 @@ def get_ai_response(user_message: HumanMessage, chain_for_request, atom_id_for_r
          # Ide is tehetnénk hibaüzenetet a UI-ra
     # ======================================================
 
-    page.padding = 20
-    page.update() # Ez kirajzolja a gombokat a helyes stílussal
+    # Erre a page.update()-re itt már nincs szükség, mert a switch_atom is hív egyet
+    # page.update()
 
     # Csak az előzmények betöltését indítjuk a háttérben
     logging.info("Háttér-előzmény betöltési szál indítása...")
