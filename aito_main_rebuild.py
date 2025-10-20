@@ -92,23 +92,21 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
-# --- Hamis MessageBubble osztály (az eredeti main_aito.py-ból) ---
-# Erre csak azért van szükség, hogy a send_click működjön.
 class MessageBubble(ft.Row):
     def __init__(self, message: HumanMessage or AIMessage):
         super().__init__()
-        # Ez egy egyszerűsített verzió a debugoláshoz
         speaker = getattr(message, 'name', None) or (CONFIG.get('user_id') if message.type == 'human' else "Ismeretlen")
         display_speaker = "Te" if speaker == CONFIG.get('user_id') else speaker
-        bubble_color = ft.Colors.BLACK
-        if speaker != CONFIG.get('user_id'):
-            color_name = ATOM_DATA.get(speaker, {}).get("color", "BLACK")
-            bubble_color = getattr(ft.Colors, color_name, ft.Colors.BLACK)
+
+        color_name = ATOM_DATA.get(speaker, {}).get("color", "BLACK")
+        bubble_color = getattr(ft.Colors, color_name, ft.Colors.BLACK)
 
         bubble_container = ft.Container(
             content=ft.Markdown(
                 f"**{display_speaker}:** {message.content}" if display_speaker != "Te" else message.content,
                 selectable=True,
+                extension_set="gitHubWeb", # Ez egy robusztus, általános Markdown értelmező
+                code_theme="atom-one-dark" # Kódrészletekhez szép sötét téma
             ),
             padding=12, border_radius=ft.border_radius.all(15), expand=True,
         )
@@ -446,6 +444,11 @@ def main(page: ft.Page):
 
         thread = threading.Thread(target=get_ai_response, args=(human_message, app_state["atom_chain"], app_state["active_atom_id"], app_state["tool_registry"]))
         thread.start()
+
+    def on_keyboard(e: ft.KeyboardEvent):
+        if e.key == "Enter" and not e.shift:
+            send_click(None)
+    page.on_keyboard_event = on_keyboard
 
     # --- Oldal Elrendezés Összeállítása ---
     page.add(
