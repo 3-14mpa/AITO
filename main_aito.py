@@ -410,30 +410,30 @@ def get_ai_response(user_message: HumanMessage, chain_for_request, atom_id_for_r
     page.on_keyboard_event = on_keyboard
 
     def initialize_app_in_background():
-        """Minden lassú, blokkoló indítási feladatot elvégez egy háttérszálon."""
-        logging.info("--- Háttér-inicializálás elindult ---")
+        """CSAK az előzményeket tölti be a háttérben."""
+        logging.info("--- Háttér-előzmény betöltés elindult ---")
         try:
-            # 1. LASSÚ LÉPÉS: Az első ATOM motorjának beállítása
-            logging.info("1/2: Motor-konfiguráció indítása...")
-            switch_atom(INITIAL_ATOM_ID)
-            logging.info("1/2: Motor-konfiguráció befejezve.")
-
-            # 2. LASSÚ LÉPÉS: Előzmények letöltése és megjelenítése
-            logging.info("2/2: Előzmények betöltése...")
-            messages_to_load = firestore_history.messages
+            logging.info("Előzmények betöltése az SQLite adatbázisból...")
+            messages_to_load = firestore_history.messages # Ez lehet lassú
+            logging.info(f"{len(messages_to_load)} üzenet sikeresen betöltve az adatbázisból.")
 
             if messages_to_load:
+                logging.info("Előzmények megjelenítése a UI-on...")
                 for msg in messages_to_load:
                     chat_history_view.controls.append(MessageBubble(msg))
-
-                page.update()
+                page.update() # Frissítés a hozzáadás után
+                logging.info("Előzmények megjelenítve. Görgőzés...")
                 time.sleep(0.5)
                 chat_history_view.scroll_to(offset=-1, duration=300)
+                page.update() # Frissítés a görgetés után
+                logging.info("Görgőzés befejeződött.")
+            else:
+                 logging.info("Nincsenek előzmények a megjelenítéshez.")
 
-            page.update()
-            logging.info("--- Háttér-inicializálás befejeződött, a rendszer készen áll. ---")
+            logging.info("--- Háttér-előzmény betöltés sikeresen befejeződött. ---")
+
         except Exception as e:
-            logging.error(f"KRITIKUS HIBA a háttér-inicializálás során: {e}", exc_info=True)
+            logging.error(f"KRITIKUS HIBA a háttér-előzmény betöltés során: {e}", exc_info=True)
             chat_history_view.controls.append(
                 MessageBubble(AIMessage(content=f"Indítási hiba: {e}", name="SYSTEM_ERROR"))
             )
@@ -556,11 +556,23 @@ def get_ai_response(user_message: HumanMessage, chain_for_request, atom_id_for_r
     )
     print(f"{time.monotonic():.4f}: Page layout OK.")
 
-    page.padding = 20
-    page.update() # Ez azonnal kirajzolja a statikus, üres UI-t
+    # === AZ ELSŐ SWITCH_ATOM HÍVÁSA ITT, A FŐ SZÁLON ===
+    try:
+        logging.info("Az első ATOM motorjának beállítása (fő szál)...")
+        switch_atom(INITIAL_ATOM_ID) # Ez blokkolhatja a UI-t egy kicsit
+        logging.info("Az első ATOM motorja sikeresen beállítva.")
+    except Exception as e:
+         logging.error(f"HIBA az első switch_atom hívásakor: {e}", exc_info=True)
+         # Ide is tehetnénk hibaüzenetet a UI-ra
+    # ======================================================
 
-    # Elindítjuk a teljes lassú inicializálást a háttérben
+    page.padding = 20
+    page.update() # Ez kirajzolja a gombokat a helyes stílussal
+
+    # Csak az előzmények betöltését indítjuk a háttérben
+    logging.info("Háttér-előzmény betöltési szál indítása...")
     page.run_thread(initialize_app_in_background)
+    logging.info("Háttérszál elindítva. A main függvény véget ért.")
 
 if __name__ == "__main__":
     ft.app(target=main)

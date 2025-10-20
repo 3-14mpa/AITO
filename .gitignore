@@ -16,3 +16,6 @@ venv/
 
 #Json
 aito-475518-808b248f7769.json
+
+# Local data
+aito_local_data/
