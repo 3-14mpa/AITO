@@ -50,7 +50,7 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict):
 
         # Store the documents in the provided vector store
         if docs_to_add:
-            docs_vector_store.add_documents(docs_to_add, batch_size=50)
+            docs_vector_store.add_documents(docs_to_add, batch_size=10)
             file_name = os.path.basename(filepath)
             print(f"--- '{file_name}' sikeresen feldolgozva: {len(docs_to_add)} darab mentve a memóriába. ---")
 
