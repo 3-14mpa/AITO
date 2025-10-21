@@ -1,6 +1,7 @@
 # document_processor.py
 
 import os
+import time
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_core.documents import Document
 from shared_components import chunk_text
@@ -47,16 +48,30 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict):
                 chunk_num=i + 1,
                 total_chunks=total_chunks_processed
             )
-            # === AZONNALI HOZZÁADÁS DARABONKÉNT ===
-            try:
-                # Az add_documents most csak EGYETLEN dokumentumot kap
-                docs_vector_store.add_documents([doc])
-                print(f"  Darab #{i + 1}/{total_chunks_processed} sikeresen hozzáadva.")
-                added_chunks_count += 1
-            except Exception as add_err:
-                print(f"!!! HIBA a(z) {i + 1}. darab hozzáadása közben: {add_err}")
-                # Folytatjuk a többi darabbal
-            # ====================================
+            # === AZONNALI HOZZÁADÁS DARABONKÉNT, ÚJRAPRÓBÁLKOZÁSSAL ===
+                # <<< FIGYELJ A BEHÚZÁSRA INNENTŐL >>>
+            max_retries = 3
+            added_successfully = False
+            for attempt in range(max_retries + 1):
+                try:
+                    docs_vector_store.add_documents([doc])
+                    print(f"  Darab #{i + 1}/{total_chunks_processed} sikeresen hozzáadva (próbálkozás: {attempt + 1}).")
+                    added_chunks_count += 1
+                    added_successfully = True
+                    time.sleep(1.1)
+                    break # Kilépés az újrapróbálkozási ciklusból
+
+                except Exception as add_err:
+                    is_quota_error = "429" in str(add_err)
+                    if is_quota_error and attempt < max_retries:
+                        wait_time = (attempt + 1) * 5
+                        print(f"!!! KVÓTA HIBA a(z) {i + 1}. darabnál ({attempt + 1}. próbálkozás). Várakozás {wait_time} mp...")
+                        time.sleep(wait_time)
+                    else:
+                        print(f"!!! VÉGLEGES HIBA a(z) {i + 1}. darab hozzáadása közben ({attempt + 1}. próbálkozás): {add_err}")
+                        break # Kilépés az újrapróbálkozási ciklusból, a darab kimarad
+            # <<< EDDIG TART AZ ÚJ BLOKK, A KÖVETKEZŐ SOR MÁR KINT VAN >>>
+        # =======================================================
 
         # A ciklus után már csak az összefoglaló kiírás marad
         file_name = os.path.basename(filepath)
