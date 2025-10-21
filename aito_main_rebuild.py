@@ -22,7 +22,7 @@ from shared_components import (
     search_memory_tool, search_knowledge_base_tool, list_uploaded_files_tool,
     set_registry_value, get_registry_value, list_registry_keys,
     generate_diagram_tool, read_full_document_tool, display_image_tool,
-    set_meeting_status, get_meeting_status
+    set_meeting_status, get_meeting_status, read_agent_notebook, update_agent_notebook
 )
 # from task_dispatcher import TaskDispatcher # Ezt még mindig nem
 from document_processor import process_and_store_document # Erre most már szükség van
@@ -192,6 +192,18 @@ def main(page: ft.Page):
     def wrapped_get_meeting_status() -> dict:
         return get_meeting_status(config=CONFIG)
 
+    def wrapped_read_notebook() -> str:
+        """Beolvassa az aktuálisan aktív ATOM privát jegyzetfüzetét."""
+        active_atom = app_state.get("active_atom_id")
+        if not active_atom: return "Hiba: Nincs aktív ATOM a jegyzetfüzet olvasásához."
+        return read_agent_notebook(agent_id=active_atom, config=CONFIG)
+
+    def wrapped_update_notebook(new_content: str) -> str:
+        """Frissíti az aktuálisan aktív ATOM privát jegyzetfüzetét."""
+        active_atom = app_state.get("active_atom_id")
+        if not active_atom: return "Hiba: Nincs aktív ATOM a jegyzetfüzet írásához."
+        return update_agent_notebook(agent_id=active_atom, new_content=new_content, config=CONFIG)
+
     # === ÁLLAPOT ===
     app_state = {"active_atom_id": INITIAL_ATOM_ID, "atom_chain": None, "tool_registry": {}}
 
@@ -237,6 +249,8 @@ def main(page: ft.Page):
             "wrapped_display_image_tool": wrapped_display_image_tool,
             "wrapped_set_meeting_status": wrapped_set_meeting_status,
             "wrapped_get_meeting_status": wrapped_get_meeting_status,
+            "wrapped_read_notebook": wrapped_read_notebook,
+            "wrapped_update_notebook": wrapped_update_notebook,
         }
         tools = list(tool_registry.values())
         llm_with_tools = llm.bind_tools(tools)
