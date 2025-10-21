@@ -254,6 +254,15 @@ def main(page: ft.Page):
             lambda session_id: firestore_history,
             input_messages_key="input",
             history_messages_key="history",
+            # === ÚJ SOROK KEZDETE ===
+            output_messages_key="output", # Expliciten megmondjuk, hol a kimenet
+            history_factory_config=[ # Megadjuk a nevet az AI üzenetekhez
+                {
+                    "type": "ai",
+                    "name": selected_atom_id # Itt adjuk át az aktuális ATOM nevét!
+                }
+            ]
+            # === ÚJ SOROK VÉGE ===
         )
         app_state["atom_chain"] = chain_with_history
         print(f"Motor átkonfigurálva: {app_state['active_atom_id']} aktív.")
