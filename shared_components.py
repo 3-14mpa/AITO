@@ -165,6 +165,8 @@ def list_uploaded_files_tool(config: dict, docs_vector_store: VectorStore) -> st
         return f"Hiba történt a fájlok listázása közben: {e}"
 
 def _get_registry_db_path():
+    # Ez a központi függvény, amely meghatározza a rendszer-nyilvántartás adatbázisának helyét.
+    # Minden registry-művelet, beleértve az ágensek jegyzetfüzeteit is, ezt az adatbázist használja.
     return os.path.join("./aito_local_data", "system_registry.db")
 
 def _initialize_registry_db():
@@ -326,3 +328,26 @@ def read_full_document_tool(filename: str, docs_vector_store: VectorStore) -> st
         return f"Hiba történt a(z) '{filename}' dokumentum olvasása közben: {e}"
 
 print("Közös komponensek modul (shared_components.py) sikeresen betöltve.")
+
+def read_agent_notebook(agent_id: str, config: dict) -> str:
+    """Beolvassa egy adott ágens privát jegyzetfüzetének tartalmát."""
+    notebook_key = f"notebook_{agent_id.lower()}" # Pl. notebook_atom1
+    value_str = get_registry_value(notebook_key, config) # A meglévő registry olvasót használjuk
+    if f"'{notebook_key}' kulcs nem található" in value_str:
+        return f"A(z) {agent_id} jegyzetfüzete még üres."
+    else:
+        # Kivesszük a körítést a get_registry_value válaszából
+        try:
+            content = value_str.split(f"A '{notebook_key}' kulcs értéke: '")[1].rstrip("'.")
+            return f"A(z) {agent_id} jegyzetfüzetének tartalma:\n---\n{content}\n---"
+        except IndexError:
+            return f"Hiba a(z) {agent_id} jegyzetfüzet tartalmának értelmezésekor."
+
+def update_agent_notebook(agent_id: str, new_content: str, config: dict) -> str:
+    """Felülírja egy adott ágens privát jegyzetfüzetének tartalmát."""
+    notebook_key = f"notebook_{agent_id.lower()}"
+    result = set_registry_value(notebook_key, new_content, config) # A meglévő registry írót használjuk
+    if "sikeresen beállítva" in result:
+        return f"A(z) {agent_id} jegyzetfüzete sikeresen frissítve."
+    else:
+        return f"Hiba a(z) {agent_id} jegyzetfüzetének frissítése közben: {result}"
