@@ -3,9 +3,9 @@
 import yaml
 import os
 import graphviz
+import tiktoken
 from collections import Counter
 from datetime import datetime, timezone
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.vectorstores import VectorStore
@@ -30,13 +30,29 @@ except Exception as e:
 # --- FÜGGVÉNYEK ---
 
 def chunk_text(text: str) -> list[str]:
-    """Feloszt egy hosszabb szöveget kb. 500 karakteres darabokra, 100 karakteres átfedéssel."""
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=100,
-        length_function=len,
-    )
-    chunks = text_splitter.split_text(text)
+    """Feloszt egy hosszabb szöveget tokenek alapján, kb. 1000 tokenes darabokra, 100 tokenes átfedéssel."""
+    # A 'cl100k_base' kódolás a legtöbb modern OpenAI modellhez (pl. GPT-4) megfelelő.
+    encoding = tiktoken.get_encoding("cl100k_base")
+
+    tokens = encoding.encode(text)
+
+    chunks = []
+    chunk_size = 1000
+    overlap = 100
+
+    i = 0
+    while i < len(tokens):
+        # Meghatározzuk a darab végét
+        end = min(i + chunk_size, len(tokens))
+
+        # A token darabot visszaalakítjuk szöveggé
+        chunk_tokens = tokens[i:end]
+        chunk_text = encoding.decode(chunk_tokens)
+        chunks.append(chunk_text)
+
+        # A következő darab kezdete az átfedés figyelembevételével
+        i += chunk_size - overlap
+
     return chunks
 
 def message_to_document(content: str, speaker: str, timestamp: str, session_id: str, chunk_num: int = 1, total_chunks: int = 1, meeting_id: str = None) -> Document:
