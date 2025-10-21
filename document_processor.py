@@ -37,22 +37,33 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict):
         # Chunk the text using the shared function
         text_chunks = chunk_text(full_text)
 
-        # Create Document objects for each chunk
-        docs_to_add = []
+        # Create Document objects for each chunk AND ADD THEM IMMEDIATELY
+        total_chunks_processed = len(text_chunks)
+        added_chunks_count = 0
         for i, chunk in enumerate(text_chunks):
             doc = create_document_chunk(
                 content=chunk,
                 source=os.path.basename(filepath),
                 chunk_num=i + 1,
-                total_chunks=len(text_chunks)
+                total_chunks=total_chunks_processed
             )
-            docs_to_add.append(doc)
+            # === AZONNALI HOZZÁADÁS DARABONKÉNT ===
+            try:
+                # Az add_documents most csak EGYETLEN dokumentumot kap
+                docs_vector_store.add_documents([doc])
+                print(f"  Darab #{i + 1}/{total_chunks_processed} sikeresen hozzáadva.")
+                added_chunks_count += 1
+            except Exception as add_err:
+                print(f"!!! HIBA a(z) {i + 1}. darab hozzáadása közben: {add_err}")
+                # Folytatjuk a többi darabbal
+            # ====================================
 
-        # Store the documents in the provided vector store
-        if docs_to_add:
-            docs_vector_store.add_documents(docs_to_add, batch_size=1)
-            file_name = os.path.basename(filepath)
-            print(f"--- '{file_name}' sikeresen feldolgozva: {len(docs_to_add)} darab mentve a memóriába. ---")
+        # A ciklus után már csak az összefoglaló kiírás marad
+        file_name = os.path.basename(filepath)
+        if added_chunks_count == total_chunks_processed:
+            print(f"--- '{file_name}' sikeresen feldolgozva: {added_chunks_count} darab mentve a memóriába. ---")
+        else:
+            print(f"--- '{file_name}' feldolgozása BEFEJEZVE HIBÁKKAL: {added_chunks_count}/{total_chunks_processed} darab mentve. Kérlek, ellenőrizd a naplót. ---")
 
     except Exception as e:
         print(f"HIBA a dokumentum feldolgozása közben: {e}")
