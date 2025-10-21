@@ -48,37 +48,9 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict):
             )
             docs_to_add.append(doc)
 
-        # --- ÚJ BLOKK: Mentés a Firestore-ba a nyilvántartáshoz ---
-        try:
-            from google.cloud import firestore
-            client = firestore.Client(project=config['project_id'])
-            collection_ref = client.collection(config['docs_firestore_collection_name'])
-
-            # Egy 'batch' írást használunk a hatékonyságért
-            batch = client.batch()
-            for doc_obj in docs_to_add:
-                # Létrehozunk egy egyedi azonosítót minden darabnak
-                doc_id = f"{doc_obj.metadata['source_document']}_chunk_{doc_obj.metadata['chunk_number']}"
-                doc_ref = collection_ref.document(doc_id)
-
-                # A LangChain Document objektumot egy egyszerű szótárrá alakítjuk
-                firestore_data = {
-                    "page_content": doc_obj.page_content,
-                    "metadata": doc_obj.metadata
-                }
-                batch.set(doc_ref, firestore_data)
-
-            batch.commit()
-            print(f"--- Nyilvántartás frissítve: {len(docs_to_add)} darab mentve a Firestore '{config['docs_firestore_collection_name']}' kollekciójába. ---")
-
-        except Exception as e:
-            print(f"HIBA a Firestore-ba mentés során: {e}")
-        # --- ÚJ BLOKK VÉGE ---
-
-
         # Store the documents in the provided vector store
         if docs_to_add:
-            docs_vector_store.add_documents(docs_to_add)
+            docs_vector_store.add_documents(docs_to_add, batch_size=1)
             file_name = os.path.basename(filepath)
             print(f"--- '{file_name}' sikeresen feldolgozva: {len(docs_to_add)} darab mentve a memóriába. ---")
 
