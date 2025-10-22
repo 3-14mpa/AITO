@@ -12,6 +12,7 @@ from langchain_core.vectorstores import VectorStore
 from langchain_chroma import Chroma
 from langchain_community.chat_message_histories.sql import SQLChatMessageHistory
 import sqlite3
+import base64
 
 # --- YAML KONFIGURÁCIÓK BETÖLTÉSE ---
 try:
@@ -262,39 +263,31 @@ def get_meeting_status(config: dict) -> dict:
         print(f"Hiba a megbeszélés állapotának lekérdezése közben: {e}")
         return {'is_active': False, 'meeting_id': ""}
 
-def generate_diagram_tool(definition: str, filename: str, config: dict) -> str:
-    """Egy szöveges definíció (pl. Graphviz DOT nyelv) alapján legenerál egy képfájlt."""
-    print(f"--- ESZKÖZHÍVÁS: Diagram_Generálása, Fájlnév: '{filename}' ---")
+def generate_diagram_tool(definition: str, config: dict) -> str:
+    """Egy szöveges definíció (pl. Graphviz DOT nyelv) alapján legenerál egy diagramot és a kép base64 kódolt változatát adja vissza."""
+    print(f"--- ESZKÖZHÍVÁS: Diagram_Generálása ---")
     try:
-        # Biztonsági okokból ellenőrizzük a fájlnevet
-        if not filename.endswith(('.png', '.svg')):
-            return "Hiba: A fájlnévnek .png vagy .svg végződésűnek kell lennie."
-
-        # Létrehozzuk a diagrams mappa abszolút elérési útját
-        output_dir = os.path.join(os.getcwd(), "diagrams")
-        os.makedirs(output_dir, exist_ok=True)
-        filepath = os.path.join(output_dir, filename)
-
         # Létrehozzuk a Graphviz objektumot a szöveges definícióból
         source = graphviz.Source(definition)
-        # Rendereljük a fájlt (a formátumot a kiterjesztésből veszi)
-        source.render(filepath, format=filepath.split('.')[-1], cleanup=True)
+        # Ahelyett, hogy fájlba renderelnénk, közvetlenül a memóriába rendereljük PNG formátumban
+        png_output = source.pipe(format='png')
 
-        return f"A '{filename}' diagram sikeresen legenerálva és elmentve a '{output_dir}' mappába. IMAGE_PATH:{filepath}"
+        # A bináris PNG adatot base64 stringgé alakítjuk
+        base64_image = base64.b64encode(png_output).decode('utf-8')
+
+        # Visszaadjuk a speciális formátumú stringet, amit a UI tud kezelni
+        return f"UI_COMMAND:DISPLAY_BASE64_IMAGE:{base64_image}"
     except Exception as e:
+        # Részletesebb hibakeresés a Graphviz telepítési problémákhoz
+        if "failed to execute" in str(e).lower() or "command not found" in str(e).lower():
+            error_message = (
+                "Hiba történt a diagram generálása közben: A 'Graphviz' végrehajtható fájl nem található. "
+                "Győződjön meg róla, hogy a Graphviz telepítve van és a rendszer PATH-jában elérhető. "
+                "Debian/Ubuntu alapú rendszereken telepítse a 'graphviz' csomagot (`sudo apt-get install graphviz`)."
+            )
+            print(f"KRITIKUS HIBA: {error_message}")
+            return error_message
         return f"Hiba történt a diagram generálása közben: {e}"
-
-
-def display_image_tool(filename: str) -> str:
-    """Megjelenít egy, a 'diagrams' mappában található képfájlt a chat ablakban."""
-    print(f"--- ESZKÖZHÍVÁS: Kép_Megjelenítése, Fájlnév: '{filename}' ---")
-    # Létrehozzuk a keresett fájl abszolút elérési útját
-    filepath = os.path.join(os.getcwd(), "diagrams", filename)
-    if os.path.exists(filepath):
-        # Visszaadjuk a speciális parancsot a UI számára
-        return f"UI_COMMAND:DISPLAY_IMAGE:{filepath}"
-    else:
-        return f"Hiba: A '{filename}' nem található a 'diagrams' mappában."
 
 def read_full_document_tool(filename: str, docs_vector_store: VectorStore) -> str:
     """
