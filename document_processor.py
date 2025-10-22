@@ -35,17 +35,6 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict, p
             print(f"HIBA a chat UI frissítése közben: {ui_update_err}")
 
 
-    # Segédfüggvény a biztonságos UI frissítéshez, már itt definiáljuk, hogy a `except` blokk is elérje
-    def _add_msg_to_chat(msg):
-        try:
-            from aito_main_rebuild import MessageBubble # Importálás a használat helyén
-            chat_history_view = page.controls[0].controls[1].content
-            chat_history_view.controls.append(MessageBubble(msg))
-            page.update()
-        except Exception as ui_update_err:
-            print(f"HIBA a chat UI frissítése közben: {ui_update_err}")
-
-
     try:
         # === KORÁBBI VERZIÓ TÖRLÉSE ===
         print(f"Korábbi '{file_name}' darabok keresése és törlése...")
@@ -72,7 +61,7 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict, p
             print(f"HIBA: Nem támogatott fájltípus: {os.path.basename(filepath)}")
             # Optionally send a message to the chat about the unsupported file type
             error_message = AIMessage(content=f"'{os.path.basename(filepath)}' fájltípus nem támogatott.", name="SYSTEM_ERROR")
-            page.run_thread(target=_add_msg_to_chat, args=(error_message,))
+            page.run_thread(_add_msg_to_chat, error_message)
             return
 
         # Load the document content
@@ -125,7 +114,7 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict, p
 
         # === BEFEJEZŐ ÜZENET KÜLDÉSE A CHATBE ===
         completion_message = AIMessage(content=completion_message_content, name="SYSTEM")
-        page.run_thread(target=_add_msg_to_chat, args=(completion_message,))
+        page.run_thread(_add_msg_to_chat, completion_message)
         # ==========================================
 
     except Exception as e:
@@ -134,6 +123,6 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict, p
         traceback.print_exc()
         # Ide is betehetnénk egy hibaüzenet küldést a chatbe, ha a teljes feldolgozás elhasal
         error_message = AIMessage(content=f"Kritikus hiba '{os.path.basename(filepath)}' feldolgozása közben: {e}", name="SYSTEM_ERROR")
-        page.run_thread(target=_add_msg_to_chat, args=(error_message,))
+        page.run_thread(_add_msg_to_chat, error_message)
 
 print("Dokumentum feldolgozó modul (document_processor.py) betöltve.")
