@@ -2,7 +2,6 @@
 
 import yaml
 import os
-import graphviz
 import tiktoken
 from collections import Counter
 from datetime import datetime, timezone
@@ -261,40 +260,6 @@ def get_meeting_status(config: dict) -> dict:
     except Exception as e:
         print(f"Hiba a megbeszélés állapotának lekérdezése közben: {e}")
         return {'is_active': False, 'meeting_id': ""}
-
-def generate_diagram_tool(definition: str, filename: str, config: dict) -> str:
-    """Egy szöveges definíció (pl. Graphviz DOT nyelv) alapján legenerál egy képfájlt."""
-    print(f"--- ESZKÖZHÍVÁS: Diagram_Generálása, Fájlnév: '{filename}' ---")
-    try:
-        # Biztonsági okokból ellenőrizzük a fájlnevet
-        if not filename.endswith(('.png', '.svg')):
-            return "Hiba: A fájlnévnek .png vagy .svg végződésűnek kell lennie."
-
-        # Létrehozzuk a diagrams mappa abszolút elérési útját
-        output_dir = os.path.join(os.getcwd(), "diagrams")
-        os.makedirs(output_dir, exist_ok=True)
-        filepath = os.path.join(output_dir, filename)
-
-        # Létrehozzuk a Graphviz objektumot a szöveges definícióból
-        source = graphviz.Source(definition)
-        # Rendereljük a fájlt (a formátumot a kiterjesztésből veszi)
-        source.render(filepath, format=filepath.split('.')[-1], cleanup=True)
-
-        return f"A '{filename}' diagram sikeresen legenerálva és elmentve a '{output_dir}' mappába. IMAGE_PATH:{filepath}"
-    except Exception as e:
-        return f"Hiba történt a diagram generálása közben: {e}"
-
-
-def display_image_tool(filename: str) -> str:
-    """Megjelenít egy, a 'diagrams' mappában található képfájlt a chat ablakban."""
-    print(f"--- ESZKÖZHÍVÁS: Kép_Megjelenítése, Fájlnév: '{filename}' ---")
-    # Létrehozzuk a keresett fájl abszolút elérési útját
-    filepath = os.path.join(os.getcwd(), "diagrams", filename)
-    if os.path.exists(filepath):
-        # Visszaadjuk a speciális parancsot a UI számára
-        return f"UI_COMMAND:DISPLAY_IMAGE:{filepath}"
-    else:
-        return f"Hiba: A '{filename}' nem található a 'diagrams' mappában."
 
 def read_full_document_tool(filename: str, docs_vector_store: VectorStore) -> str:
     """
