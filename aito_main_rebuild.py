@@ -19,13 +19,14 @@ from langchain_core.tools import StructuredTool
 from pydantic.v1 import BaseModel, Field
 
 
+
 # --- Saját modulok importálása ---
 # Most már szükségünk van az összes eszközre is!
 from shared_components import (
     ATOM_DATA, PROMPTS, message_to_document, chunk_text,
     search_memory_tool, search_knowledge_base_tool, list_uploaded_files_tool,
     set_registry_value, get_registry_value, list_registry_keys,
-    generate_diagram_tool, read_full_document_tool,
+    read_full_document_tool,
     set_meeting_status, get_meeting_status, read_agent_notebook, update_agent_notebook
 )
 # from task_dispatcher import TaskDispatcher # Ezt még mindig nem
@@ -204,18 +205,6 @@ def main(page: ft.Page):
         return get_registry_value(key=key, config=CONFIG)
     def wrapped_list_registry_keys() -> str:
         return list_registry_keys(config=CONFIG)
-    def wrapped_generate_diagram_tool(definition: str) -> str:
-        return generate_diagram_tool(definition=definition, config=CONFIG)
-
-    class DiagramToolSchema(BaseModel):
-        definition: str = Field(description="A Graphviz DOT nyelv szintaxisát követő szöveges definíció a diagram elkészítéséhez.")
-
-    structured_diagram_tool = StructuredTool.from_function(
-        func=wrapped_generate_diagram_tool,
-        name="wrapped_generate_diagram_tool",
-        description="Egy szöveges definíció (pl. Graphviz DOT nyelv) alapján legenerál egy diagramot és a kép base64 kódolt változatát adja vissza.",
-        args_schema=DiagramToolSchema
-    )
     def wrapped_read_full_document_tool(filename: str) -> str:
         return read_full_document_tool(filename=filename, docs_vector_store=docs_vector_store) # <- FIGYELEM: Ezt ki kellett egészítenem a docs_vector_store-ral
     def wrapped_set_meeting_status(active: bool, meeting_id: str = "") -> str:
@@ -275,7 +264,6 @@ def main(page: ft.Page):
             "wrapped_set_registry_value": wrapped_set_registry_value,
             "wrapped_get_registry_value": wrapped_get_registry_value,
             "wrapped_list_registry_keys": wrapped_list_registry_keys,
-            "wrapped_generate_diagram_tool": structured_diagram_tool,
             "wrapped_read_full_document_tool": wrapped_read_full_document_tool,
             "wrapped_set_meeting_status": wrapped_set_meeting_status,
             "wrapped_get_meeting_status": wrapped_get_meeting_status,
@@ -283,22 +271,8 @@ def main(page: ft.Page):
             "wrapped_update_notebook": wrapped_update_notebook,
         }
 
-        tools_for_binding = [
-            wrapped_search_memory_tool,
-            wrapped_search_knowledge_base_tool,
-            wrapped_list_uploaded_files_tool,
-            wrapped_set_registry_value,
-            wrapped_get_registry_value,
-            wrapped_list_registry_keys,
-            structured_diagram_tool,  # Itt a strukturált eszközt adjuk át a modellnek
-            wrapped_read_full_document_tool,
-            wrapped_set_meeting_status,
-            wrapped_get_meeting_status,
-            wrapped_read_notebook,
-            wrapped_update_notebook,
-        ]
-
-        llm_with_tools = llm.bind_tools(tools_for_binding)
+        tools = list(tool_registry.values())
+        llm_with_tools = llm.bind_tools(tools)
 
         app_state["tool_registry"] = tool_registry
 
@@ -389,20 +363,6 @@ def main(page: ft.Page):
                     tool_output = tool_to_call(**tool_call['args'])
                     logging.debug(f"Nyers eszköz-kimenet a '{tool_name}' eszköztől: {tool_output}")
 
-                    # --- EGYSZERŰSÍTETT UI PARANCS KEZELÉSE ---
-                    if isinstance(tool_output, str) and tool_output.startswith("UI_COMMAND:DISPLAY_BASE64_IMAGE:"):
-                        logging.info(f"UI parancs (Base64 Kép) észlelve.")
-                        base64_data = tool_output.split(":", 2)[2]
-
-                        # A `page.run_thread` hívás most már az új `add_image_bubble_to_chat` függvényt célozza.
-                        # Átadjuk a base64 adatot és az aktuális ATOM azonosítóját, mint "speaker".
-                        page.run_thread(add_image_bubble_to_chat, base64_data, atom_id_for_request)
-
-                        # Mivel a kép megjelenítése egy végleges művelet, itt megállítjuk a további feldolgozást erre a körre.
-                        logging.info("Base64 kép megjelenítése elindítva, a jelenlegi válaszadási kör befejeződött.")
-                        return  # Kilépünk a `get_ai_response` függvényből.
-
-                    # Ha a kimenet nem UI parancs, akkor normál ToolMessage-ként kezeljük
                     tool_messages.append(ToolMessage(content=tool_output, tool_call_id=tool_call['id'], name=tool_name))
 
                 # A modell újrahívása az eszközök kimenetével
@@ -445,19 +405,6 @@ def main(page: ft.Page):
             chat_history_view.controls.pop()
         chat_history_view.controls.append(MessageBubble(ai_message))
         page.update()
-
-    def add_image_bubble_to_chat(base64_image: str, speaker: str):
-        """Biztonságosan hozzáad egy base64 kódolású kép-buborékot a chat ablakhoz."""
-        # Mivel ez egy másik szálból (page.run_thread) fut, a 'thinking' buborékot itt kell eltávolítani.
-        if chat_history_view.controls and isinstance(chat_history_view.controls[-1], MessageBubble):
-            # Egyszerűsített ellenőrzés: ha az utolsó buborék egy MessageBubble, feltételezzük, hogy az a "gondolkodik..." üzenet.
-            # Egy robosztusabb megoldás lehetne egy flag használata.
-            chat_history_view.controls.pop()
-
-        image_bubble = ImageBubble(base64_image=base64_image, speaker=speaker)
-        chat_history_view.controls.append(image_bubble)
-        page.update()
-        logging.info(f"Kép-buborék sikeresen hozzáadva a chathez a(z) '{speaker}' által.")
 
     def send_click(e):
         user_input_text = input_field.value

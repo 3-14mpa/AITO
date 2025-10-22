@@ -2,7 +2,6 @@
 
 import yaml
 import os
-import graphviz
 import tiktoken
 from collections import Counter
 from datetime import datetime, timezone
@@ -262,32 +261,6 @@ def get_meeting_status(config: dict) -> dict:
     except Exception as e:
         print(f"Hiba a megbeszélés állapotának lekérdezése közben: {e}")
         return {'is_active': False, 'meeting_id': ""}
-
-def generate_diagram_tool(definition: str, config: dict) -> str:
-    """Egy szöveges definíció (pl. Graphviz DOT nyelv) alapján legenerál egy diagramot és a kép base64 kódolt változatát adja vissza."""
-    print(f"--- ESZKÖZHÍVÁS: Diagram_Generálása ---")
-    try:
-        # Létrehozzuk a Graphviz objektumot a szöveges definícióból
-        source = graphviz.Source(definition)
-        # Ahelyett, hogy fájlba renderelnénk, közvetlenül a memóriába rendereljük PNG formátumban
-        png_output = source.pipe(format='png')
-
-        # A bináris PNG adatot base64 stringgé alakítjuk
-        base64_image = base64.b64encode(png_output).decode('utf-8')
-
-        # Visszaadjuk a speciális formátumú stringet, amit a UI tud kezelni
-        return f"UI_COMMAND:DISPLAY_BASE64_IMAGE:{base64_image}"
-    except Exception as e:
-        # Részletesebb hibakeresés a Graphviz telepítési problémákhoz
-        if "failed to execute" in str(e).lower() or "command not found" in str(e).lower():
-            error_message = (
-                "Hiba történt a diagram generálása közben: A 'Graphviz' végrehajtható fájl nem található. "
-                "Győződjön meg róla, hogy a Graphviz telepítve van és a rendszer PATH-jában elérhető. "
-                "Debian/Ubuntu alapú rendszereken telepítse a 'graphviz' csomagot (`sudo apt-get install graphviz`)."
-            )
-            print(f"KRITIKUS HIBA: {error_message}")
-            return error_message
-        return f"Hiba történt a diagram generálása közben: {e}"
 
 def read_full_document_tool(filename: str, docs_vector_store: VectorStore) -> str:
     """
