@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 # --- LangChain Importok (Most már az AI motorhoz is kellenek) ---
 from langchain_google_vertexai import ChatVertexAI, HarmCategory, HarmBlockThreshold, VertexAIEmbeddings
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_community.chat_message_histories.sql import SQLChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
