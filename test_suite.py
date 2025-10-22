@@ -139,8 +139,7 @@ class TestReadFullDocumentTool(unittest.TestCase):
         result = read_full_document_tool(filename="test.txt", docs_vector_store=mock_docs_vector_store)
 
         # ASSERT
-        self.assertIn("A 'test.txt' dokumentum teljes tartalma sikeresen beolvasva.", result)
-        self.assertIn("Hello, world", result)
+        self.assertEqual("DOCUMENT_CONTENT:\nHello, world", result)
         print("\n'test_read_full_document_reconstructs_text' ran successfully!")
 
     def test_read_full_document_handles_not_found(self):

@@ -322,7 +322,7 @@ def read_full_document_tool(filename: str, docs_vector_store: VectorStore) -> st
         # A rendezett dokumentumok tartalmának összefűzése.
         full_text = "".join(doc[0] for doc in sorted_docs)
 
-        return f"A '{filename}' dokumentum teljes tartalma sikeresen beolvasva. A tartalom:\n\n---\n{full_text}\n---"
+        return f"DOCUMENT_CONTENT:\n{full_text}"
 
     except Exception as e:
         return f"Hiba történt a(z) '{filename}' dokumentum olvasása közben: {e}"
