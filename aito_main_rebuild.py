@@ -15,6 +15,9 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
+from langchain_core.tools import StructuredTool
+from pydantic.v1 import BaseModel, Field
+
 
 # --- Saját modulok importálása ---
 # Most már szükségünk van az összes eszközre is!
@@ -202,6 +205,16 @@ def main(page: ft.Page):
         return list_registry_keys(config=CONFIG)
     def wrapped_generate_diagram_tool(definition: str) -> str:
         return generate_diagram_tool(definition=definition, config=CONFIG)
+
+    class DiagramToolSchema(BaseModel):
+        definition: str = Field(description="A Graphviz DOT nyelv szintaxisát követő szöveges definíció a diagram elkészítéséhez.")
+
+    structured_diagram_tool = StructuredTool.from_function(
+        func=wrapped_generate_diagram_tool,
+        name="wrapped_generate_diagram_tool",
+        description="Egy szöveges definíció (pl. Graphviz DOT nyelv) alapján legenerál egy diagramot és a kép base64 kódolt változatát adja vissza.",
+        args_schema=DiagramToolSchema
+    )
     def wrapped_read_full_document_tool(filename: str) -> str:
         return read_full_document_tool(filename=filename, docs_vector_store=docs_vector_store) # <- FIGYELEM: Ezt ki kellett egészítenem a docs_vector_store-ral
     def wrapped_set_meeting_status(active: bool, meeting_id: str = "") -> str:
@@ -261,7 +274,7 @@ def main(page: ft.Page):
             "wrapped_set_registry_value": wrapped_set_registry_value,
             "wrapped_get_registry_value": wrapped_get_registry_value,
             "wrapped_list_registry_keys": wrapped_list_registry_keys,
-            "wrapped_generate_diagram_tool": wrapped_generate_diagram_tool,
+            "wrapped_generate_diagram_tool": structured_diagram_tool,
             "wrapped_read_full_document_tool": wrapped_read_full_document_tool,
             "wrapped_set_meeting_status": wrapped_set_meeting_status,
             "wrapped_get_meeting_status": wrapped_get_meeting_status,
