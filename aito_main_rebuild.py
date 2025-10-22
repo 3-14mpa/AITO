@@ -121,7 +121,8 @@ class MessageBubble(ft.Row):
             bubble_container.bgcolor = ft.Colors.WHITE10
         else:
             self.alignment = ft.MainAxisAlignment.START
-            bubble_container.bgcolor = bubble_color
+            # Az eredeti színhez hozzáadunk egy kis áttetszőséget
+            bubble_container.bgcolor = ft.colors.with_opacity(0.3, bubble_color) # <-- JAVÍTVA
         self.controls = [bubble_container]
 
 
