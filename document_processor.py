@@ -22,6 +22,18 @@ def create_document_chunk(content: str, source: str, chunk_num: int, total_chunk
 def process_and_store_document(filepath: str, docs_vector_store, config: dict, page: ft.Page):
     """Loads, processes, chunks, and stores a document in the specified vector store."""
     print(f"--- Dokumentum feldolgozása: {filepath} ---")
+    file_name = os.path.basename(filepath) # Fájlnév kinyerése
+
+    # Segédfüggvény a biztonságos UI frissítéshez, már itt definiáljuk, hogy a `except` blokk is elérje
+    def _add_msg_to_chat(msg):
+        try:
+            from aito_main_rebuild import MessageBubble # Importálás a használat helyén
+            chat_history_view = page.controls[0].controls[1].content
+            chat_history_view.controls.append(MessageBubble(msg))
+            page.update()
+        except Exception as ui_update_err:
+            print(f"HIBA a chat UI frissítése közben: {ui_update_err}")
+
 
     # Segédfüggvény a biztonságos UI frissítéshez, már itt definiáljuk, hogy a `except` blokk is elérje
     def _add_msg_to_chat(msg):
@@ -35,6 +47,22 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict, p
 
 
     try:
+        # === KORÁBBI VERZIÓ TÖRLÉSE ===
+        print(f"Korábbi '{file_name}' darabok keresése és törlése...")
+        try:
+            # Lekérdezzük az összes ID-t, ami ehhez a fájlhoz tartozik
+            existing_ids = docs_vector_store.get(where={"source_document": file_name}).get("ids", [])
+            if existing_ids:
+                print(f"  {len(existing_ids)} korábbi darab törlése...")
+                docs_vector_store.delete(ids=existing_ids)
+                print(f"  Korábbi darabok sikeresen törölve.")
+            else:
+                print(f"  Nincsenek korábbi darabok ehhez a fájlhoz.")
+        except Exception as delete_err:
+            # Logoljuk a hibát, de folytatjuk a feltöltéssel
+            print(f"!!! FIGYELMEZTETÉS: Hiba történt a korábbi darabok törlése közben: {delete_err}")
+        # =============================
+
         # Determine loader based on file extension
         if filepath.lower().endswith(".pdf"):
             loader = PyPDFLoader(filepath)
