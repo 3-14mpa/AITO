@@ -281,8 +281,11 @@ def main(page: ft.Page):
             "wrapped_read_notebook": wrapped_read_notebook,
             "wrapped_update_notebook": wrapped_update_notebook,
         }
-        tools = list(tool_registry.values())
-        llm_with_tools = llm.bind_tools(tools)
+
+        tools_for_binding = list(tool_registry.values())
+        tools_for_binding[tools_for_binding.index(wrapped_generate_diagram_tool)] = structured_diagram_tool
+
+        llm_with_tools = llm.bind_tools(tools_for_binding)
 
         app_state["tool_registry"] = tool_registry
 
