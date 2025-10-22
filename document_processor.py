@@ -2,8 +2,10 @@
 
 import os
 import time
+import flet as ft
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_core.documents import Document
+from langchain_core.messages import AIMessage
 from shared_components import chunk_text
 
 def create_document_chunk(content: str, source: str, chunk_num: int, total_chunks: int) -> Document:
@@ -17,11 +19,39 @@ def create_document_chunk(content: str, source: str, chunk_num: int, total_chunk
         }
     )
 
-def process_and_store_document(filepath: str, docs_vector_store, config: dict):
+def process_and_store_document(filepath: str, docs_vector_store, config: dict, page: ft.Page):
     """Loads, processes, chunks, and stores a document in the specified vector store."""
     print(f"--- Dokumentum feldolgozása: {filepath} ---")
+    file_name = os.path.basename(filepath) # Fájlnév kinyerése
+
+    # Segédfüggvény a biztonságos UI frissítéshez, már itt definiáljuk, hogy a `except` blokk is elérje
+    def _add_msg_to_chat(msg):
+        try:
+            from aito_main_rebuild import MessageBubble # Importálás a használat helyén
+            chat_history_view = page.controls[0].controls[1].content
+            chat_history_view.controls.append(MessageBubble(msg))
+            page.update()
+        except Exception as ui_update_err:
+            print(f"HIBA a chat UI frissítése közben: {ui_update_err}")
+
 
     try:
+        # === KORÁBBI VERZIÓ TÖRLÉSE ===
+        print(f"Korábbi '{file_name}' darabok keresése és törlése...")
+        try:
+            # Lekérdezzük az összes ID-t, ami ehhez a fájlhoz tartozik
+            existing_ids = docs_vector_store.get(where={"source_document": file_name}).get("ids", [])
+            if existing_ids:
+                print(f"  {len(existing_ids)} korábbi darab törlése...")
+                docs_vector_store.delete(ids=existing_ids)
+                print(f"  Korábbi darabok sikeresen törölve.")
+            else:
+                print(f"  Nincsenek korábbi darabok ehhez a fájlhoz.")
+        except Exception as delete_err:
+            # Logoljuk a hibát, de folytatjuk a feltöltéssel
+            print(f"!!! FIGYELMEZTETÉS: Hiba történt a korábbi darabok törlése közben: {delete_err}")
+        # =============================
+
         # Determine loader based on file extension
         if filepath.lower().endswith(".pdf"):
             loader = PyPDFLoader(filepath)
@@ -29,6 +59,9 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict):
             loader = TextLoader(filepath, encoding="utf-8")
         else:
             print(f"HIBA: Nem támogatott fájltípus: {os.path.basename(filepath)}")
+            # Optionally send a message to the chat about the unsupported file type
+            error_message = AIMessage(content=f"'{os.path.basename(filepath)}' fájltípus nem támogatott.", name="SYSTEM_ERROR")
+            page.run_thread(target=_add_msg_to_chat, args=(error_message,))
             return
 
         # Load the document content
@@ -49,7 +82,6 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict):
                 total_chunks=total_chunks_processed
             )
             # === AZONNALI HOZZÁADÁS DARABONKÉNT, ÚJRAPRÓBÁLKOZÁSSAL ===
-                # <<< FIGYELJ A BEHÚZÁSRA INNENTŐL >>>
             max_retries = 3
             added_successfully = False
             for attempt in range(max_retries + 1):
@@ -58,7 +90,7 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict):
                     print(f"  Darab #{i + 1}/{total_chunks_processed} sikeresen hozzáadva (próbálkozás: {attempt + 1}).")
                     added_chunks_count += 1
                     added_successfully = True
-                    time.sleep(3)
+                    time.sleep(3) # Consider making this sleep configurable or removing it if not necessary for rate limiting
                     break # Kilépés az újrapróbálkozási ciklusból
 
                 except Exception as add_err:
@@ -70,19 +102,27 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict):
                     else:
                         print(f"!!! VÉGLEGES HIBA a(z) {i + 1}. darab hozzáadása közben ({attempt + 1}. próbálkozás): {add_err}")
                         break # Kilépés az újrapróbálkozási ciklusból, a darab kimarad
-            # <<< EDDIG TART AZ ÚJ BLOKK, A KÖVETKEZŐ SOR MÁR KINT VAN >>>
-        # =======================================================
 
         # A ciklus után már csak az összefoglaló kiírás marad
         file_name = os.path.basename(filepath)
         if added_chunks_count == total_chunks_processed:
             print(f"--- '{file_name}' sikeresen feldolgozva: {added_chunks_count} darab mentve a memóriába. ---")
+            completion_message_content = f"'{file_name}' feldolgozása sikeresen befejeződött ({added_chunks_count} darab)."
         else:
             print(f"--- '{file_name}' feldolgozása BEFEJEZVE HIBÁKKAL: {added_chunks_count}/{total_chunks_processed} darab mentve. Kérlek, ellenőrizd a naplót. ---")
+            completion_message_content = f"'{file_name}' feldolgozása hibákkal fejeződött be ({added_chunks_count}/{total_chunks_processed} darab mentve)."
+
+        # === BEFEJEZŐ ÜZENET KÜLDÉSE A CHATBE ===
+        completion_message = AIMessage(content=completion_message_content, name="SYSTEM")
+        page.run_thread(target=_add_msg_to_chat, args=(completion_message,))
+        # ==========================================
 
     except Exception as e:
         print(f"HIBA a dokumentum feldolgozása közben: {e}")
         import traceback
         traceback.print_exc()
+        # Ide is betehetnénk egy hibaüzenet küldést a chatbe, ha a teljes feldolgozás elhasal
+        error_message = AIMessage(content=f"Kritikus hiba '{os.path.basename(filepath)}' feldolgozása közben: {e}", name="SYSTEM_ERROR")
+        page.run_thread(target=_add_msg_to_chat, args=(error_message,))
 
 print("Dokumentum feldolgozó modul (document_processor.py) betöltve.")
