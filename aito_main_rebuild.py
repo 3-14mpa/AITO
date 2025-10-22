@@ -283,8 +283,12 @@ def main(page: ft.Page):
             "wrapped_update_notebook": wrapped_update_notebook,
         }
 
-        tools_for_binding = list(tool_registry.values())
-        tools_for_binding[tools_for_binding.index(wrapped_generate_diagram_tool)] = structured_diagram_tool
+        tools_for_binding = []
+        for tool in tool_registry.values():
+            if tool.__name__ == "wrapped_generate_diagram_tool":
+                tools_for_binding.append(structured_diagram_tool)
+            else:
+                tools_for_binding.append(tool)
 
         llm_with_tools = llm.bind_tools(tools_for_binding)
 
