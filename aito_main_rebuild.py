@@ -15,6 +15,9 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
+from langchain_core.tools import StructuredTool
+from pydantic.v1 import BaseModel, Field
+
 
 
 # --- Saját modulok importálása ---
@@ -119,8 +122,25 @@ class MessageBubble(ft.Row):
             bubble_container.bgcolor = ft.Colors.WHITE10
         else:
             self.alignment = ft.MainAxisAlignment.START
-            bubble_container.bgcolor = bubble_color
+            # Az eredeti színhez hozzáadunk egy kis áttetszőséget
+            bubble_container.bgcolor = ft.Colors.with_opacity(0.3, bubble_color) # <-- JAVÍTVA
         self.controls = [bubble_container]
+
+
+class ImageBubble(ft.Row):
+    def __init__(self, base64_image: str, speaker: str):
+        super().__init__()
+        color_name = ATOM_DATA.get(speaker, {}).get("color", "BLACK")
+        bubble_color = getattr(ft.Colors, color_name, ft.Colors.BLACK)
+
+        image_container = ft.Container(
+            content=ft.Image(src_base64=base64_image),
+            padding=12,
+            border_radius=ft.border_radius.all(15),
+            bgcolor=bubble_color
+        )
+        self.alignment = ft.MainAxisAlignment.START
+        self.controls = [image_container]
 
 
 def main(page: ft.Page):

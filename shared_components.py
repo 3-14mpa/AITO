@@ -11,6 +11,7 @@ from langchain_core.vectorstores import VectorStore
 from langchain_chroma import Chroma
 from langchain_community.chat_message_histories.sql import SQLChatMessageHistory
 import sqlite3
+import base64
 
 # --- YAML KONFIGURÁCIÓK BETÖLTÉSE ---
 try:
