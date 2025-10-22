@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.vectorstores import VectorStore
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_community.chat_message_histories.sql import SQLChatMessageHistory
 import sqlite3
 
