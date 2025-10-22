@@ -283,12 +283,20 @@ def main(page: ft.Page):
             "wrapped_update_notebook": wrapped_update_notebook,
         }
 
-        tools_for_binding = []
-        for tool in tool_registry.values():
-            if tool.__name__ == "wrapped_generate_diagram_tool":
-                tools_for_binding.append(structured_diagram_tool)
-            else:
-                tools_for_binding.append(tool)
+        tools_for_binding = [
+            wrapped_search_memory_tool,
+            wrapped_search_knowledge_base_tool,
+            wrapped_list_uploaded_files_tool,
+            wrapped_set_registry_value,
+            wrapped_get_registry_value,
+            wrapped_list_registry_keys,
+            structured_diagram_tool,  # Itt a strukturált eszközt adjuk át a modellnek
+            wrapped_read_full_document_tool,
+            wrapped_set_meeting_status,
+            wrapped_get_meeting_status,
+            wrapped_read_notebook,
+            wrapped_update_notebook,
+        ]
 
         llm_with_tools = llm.bind_tools(tools_for_binding)
 
