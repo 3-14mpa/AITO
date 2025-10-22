@@ -144,7 +144,7 @@ def main(page: ft.Page):
             # A feldolgozás elindítása egy külön szálon, hogy a UI ne fagyjon le
             thread = threading.Thread(
                 target=process_and_store_document,
-                args=(uploaded_file_path, docs_vector_store, CONFIG) # <--- A CONFIG hozzáadása itt
+                args=(uploaded_file_path, docs_vector_store, CONFIG, page) # <-- page hozzáadva az args-hoz
             )
             thread.start()
 
