@@ -101,7 +101,7 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict, p
                     print(f"  Darab #{i + 1}/{total_chunks_processed} sikeresen hozzáadva (próbálkozás: {attempt + 1}).")
                     added_chunks_count += 1
                     added_successfully = True
-                    time.sleep(3) # Consider making this sleep configurable or removing it if not necessary for rate limiting
+                    time.sleep(5) # Consider making this sleep configurable or removing it if not necessary for rate limiting
                     break # Kilépés az újrapróbálkozási ciklusból
 
                 except Exception as add_err:
