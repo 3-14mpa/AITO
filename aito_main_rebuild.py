@@ -22,7 +22,7 @@ from shared_components import (
     ATOM_DATA, PROMPTS, message_to_document, chunk_text,
     search_memory_tool, search_knowledge_base_tool, list_uploaded_files_tool,
     set_registry_value, get_registry_value, list_registry_keys,
-    generate_diagram_tool, read_full_document_tool, display_image_tool,
+    generate_diagram_tool, read_full_document_tool,
     set_meeting_status, get_meeting_status, read_agent_notebook, update_agent_notebook
 )
 # from task_dispatcher import TaskDispatcher # Ezt még mindig nem
@@ -122,6 +122,22 @@ class MessageBubble(ft.Row):
         self.controls = [bubble_container]
 
 
+class ImageBubble(ft.Row):
+    def __init__(self, base64_image: str, speaker: str):
+        super().__init__()
+        color_name = ATOM_DATA.get(speaker, {}).get("color", "BLACK")
+        bubble_color = getattr(ft.Colors, color_name, ft.Colors.BLACK)
+
+        image_container = ft.Container(
+            content=ft.Image(src_base64=base64_image),
+            padding=12,
+            border_radius=ft.border_radius.all(15),
+            bgcolor=bubble_color
+        )
+        self.alignment = ft.MainAxisAlignment.START
+        self.controls = [image_container]
+
+
 def main(page: ft.Page):
     start_time = time.monotonic()
     print(f"{start_time:.4f}: Main function started.")
@@ -184,12 +200,10 @@ def main(page: ft.Page):
         return get_registry_value(key=key, config=CONFIG)
     def wrapped_list_registry_keys() -> str:
         return list_registry_keys(config=CONFIG)
-    def wrapped_generate_diagram_tool(definition: str, filename: str) -> str:
-        return generate_diagram_tool(definition=definition, filename=filename, config=CONFIG)
+    def wrapped_generate_diagram_tool(definition: str) -> str:
+        return generate_diagram_tool(definition=definition, config=CONFIG)
     def wrapped_read_full_document_tool(filename: str) -> str:
         return read_full_document_tool(filename=filename, docs_vector_store=docs_vector_store) # <- FIGYELEM: Ezt ki kellett egészítenem a docs_vector_store-ral
-    def wrapped_display_image_tool(filename: str) -> str:
-        return display_image_tool(filename=filename)
     def wrapped_set_meeting_status(active: bool, meeting_id: str = "") -> str:
         return set_meeting_status(active=active, meeting_id=meeting_id, config=CONFIG)
     def wrapped_get_meeting_status() -> dict:
@@ -249,7 +263,6 @@ def main(page: ft.Page):
             "wrapped_list_registry_keys": wrapped_list_registry_keys,
             "wrapped_generate_diagram_tool": wrapped_generate_diagram_tool,
             "wrapped_read_full_document_tool": wrapped_read_full_document_tool,
-            "wrapped_display_image_tool": wrapped_display_image_tool,
             "wrapped_set_meeting_status": wrapped_set_meeting_status,
             "wrapped_get_meeting_status": wrapped_get_meeting_status,
             "wrapped_read_notebook": wrapped_read_notebook,
@@ -330,7 +343,6 @@ def main(page: ft.Page):
     def get_ai_response(user_message: HumanMessage, chain_for_request, atom_id_for_request: str, tool_registry: dict):
         try:
             config = {"configurable": {"session_id": CONFIG['session_id']}}
-
             current_input = {"input": user_message.content, "active_atom_role": atom_id_for_request}
             response = chain_for_request.invoke(current_input, config=config)
 
@@ -348,45 +360,31 @@ def main(page: ft.Page):
                     tool_output = tool_to_call(**tool_call['args'])
                     logging.debug(f"Nyers eszköz-kimenet a '{tool_name}' eszköztől: {tool_output}")
 
-                    # --- JAVÍTOTT BLOKK: Kliens-oldali UI parancsok kezelése ---
-                    if isinstance(tool_output, str) and tool_output.startswith("UI_COMMAND:DISPLAY_IMAGE:"):
-                        logging.info(f"UI parancs észlelve: {tool_output}")
-                        image_path = tool_output.split(":", 2)[2]
+                    # --- EGYSZERŰSÍTETT UI PARANCS KEZELÉSE ---
+                    if isinstance(tool_output, str) and tool_output.startswith("UI_COMMAND:DISPLAY_BASE64_IMAGE:"):
+                        logging.info(f"UI parancs (Base64 Kép) észlelve.")
+                        base64_data = tool_output.split(":", 2)[2]
 
-                        page.run_thread(add_image_bubble_to_chat, image_path.strip())
+                        # A `page.run_thread` hívás most már az új `add_image_bubble_to_chat` függvényt célozza.
+                        # Átadjuk a base64 adatot és az aktuális ATOM azonosítóját, mint "speaker".
+                        page.run_thread(add_image_bubble_to_chat, base64_data, atom_id_for_request)
 
-                        # KRITIKUS JAVÍTÁS: Mivel a feladat (a kép megjelenítése) egy VÉGSŐ művelet,
-                        # itt azonnal, erőszakosan kilépünk a teljes get_ai_response függvényből.
-                        # Nincs több modellhívás, nincs több ciklus.
-                        logging.info("UI parancs végrehajtva, a kör befejeződött.")
-                        return  # <-- EZ A LÉNYEG!
-                    elif tool_name == "wrapped_generate_diagram_tool" and "IMAGE_PATH:" in tool_output:
-                        logging.info(f"Diagram generálás utáni azonnali megjelenítés észlelve.")
-                        # A szöveges üzenetet és az elérési utat szétválasztjuk
-                        message_part, path_part = tool_output.split("IMAGE_PATH:")
-                        image_path = path_part.strip()
+                        # Mivel a kép megjelenítése egy végleges művelet, itt megállítjuk a további feldolgozást erre a körre.
+                        logging.info("Base64 kép megjelenítése elindítva, a jelenlegi válaszadási kör befejeződött.")
+                        return  # Kilépünk a `get_ai_response` függvényből.
 
-                        # Először kiírjuk a szöveges üzenetet, hogy a diagram elkészült
-                        tool_messages.append(ToolMessage(content=message_part.strip(), tool_call_id=tool_call['id'], name=tool_name))
-
-                        # Majd azonnal meghívjuk a képmegjelenítőt
-                        page.run_thread(add_image_bubble_to_chat, image_path)
-
-                        # A biztonság kedvéért itt is kiléphetünk.
-                        logging.info("A diagram azonnal megjelenítve, a kör befejeződött.")
-                        return # Kilépés a teljes függvényből
+                    # Ha a kimenet nem UI parancs, akkor normál ToolMessage-ként kezeljük
                     tool_messages.append(ToolMessage(content=tool_output, tool_call_id=tool_call['id'], name=tool_name))
 
+                # A modell újrahívása az eszközök kimenetével
                 current_input = {"input": tool_messages, "active_atom_role": atom_id_for_request}
                 response = chain_for_request.invoke(current_input, config=config)
 
-            # A ciklus végén a 'response' már a végleges, emberi válasz
-            # A 'name' és 'timestamp' mezőket a RunnableLambda már beállította.
+            # Ha a ciklus lefutott (vagy nem is volt benne tool_calls), a `response` a végleges szöveges válasz.
             final_response = response
             print(f"AI üzenet ({final_response.name}) a láncon keresztül automatikusan mentve (SQLite).")
 
-
-            # Most jöhet a darabolás és a vektoros mentés
+            # Szöveges válasz feldolgozása és megjelenítése
             text_chunks = chunk_text(final_response.content)
             documents_to_add = []
             meeting_status = wrapped_get_meeting_status()
@@ -405,6 +403,7 @@ def main(page: ft.Page):
             if documents_to_add:
                 vector_store.add_documents(documents_to_add)
                 print(f"AI üzenet {len(documents_to_add)} darabra vágva és a memóriába mentve.")
+
             page.run_thread(update_ui_with_ai_message, final_response)
 
         except Exception as ex:
@@ -418,18 +417,18 @@ def main(page: ft.Page):
         chat_history_view.controls.append(MessageBubble(ai_message))
         page.update()
 
-    def add_image_bubble_to_chat(image_path: str):
-        """Biztonságosan hozzáad egy kép-buborékot a chat ablakhoz."""
-        image_bubble = ft.Row(
-            [ft.Container(
-                content=ft.Image(src=image_path),
-                padding=12, border_radius=ft.border_radius.all(15)
-            )],
-            alignment=ft.MainAxisAlignment.START
-        )
+    def add_image_bubble_to_chat(base64_image: str, speaker: str):
+        """Biztonságosan hozzáad egy base64 kódolású kép-buborékot a chat ablakhoz."""
+        # Mivel ez egy másik szálból (page.run_thread) fut, a 'thinking' buborékot itt kell eltávolítani.
+        if chat_history_view.controls and isinstance(chat_history_view.controls[-1], MessageBubble):
+            # Egyszerűsített ellenőrzés: ha az utolsó buborék egy MessageBubble, feltételezzük, hogy az a "gondolkodik..." üzenet.
+            # Egy robosztusabb megoldás lehetne egy flag használata.
+            chat_history_view.controls.pop()
+
+        image_bubble = ImageBubble(base64_image=base64_image, speaker=speaker)
         chat_history_view.controls.append(image_bubble)
         page.update()
-        logging.info(f"Kép-buborék sikeresen hozzáadva a chathez: {image_path}")
+        logging.info(f"Kép-buborék sikeresen hozzáadva a chathez a(z) '{speaker}' által.")
 
     def send_click(e):
         user_input_text = input_field.value
