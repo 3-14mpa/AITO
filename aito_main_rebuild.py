@@ -268,15 +268,6 @@ def main(page: ft.Page):
             lambda session_id: firestore_history,
             input_messages_key="input",
             history_messages_key="history",
-            # === ÚJ SOROK KEZDETE ===
-            output_messages_key="output", # Expliciten megmondjuk, hol a kimenet
-            history_factory_config=[ # Megadjuk a nevet az AI üzenetekhez
-                {
-                    "type": "ai",
-                    "name": selected_atom_id # Itt adjuk át az aktuális ATOM nevét!
-                }
-            ]
-            # === ÚJ SOROK VÉGE ===
         )
         app_state["atom_chain"] = chain_with_history
         print(f"Motor átkonfigurálva: {app_state['active_atom_id']} aktív.")
@@ -376,9 +367,15 @@ def main(page: ft.Page):
 
             # A ciklus végén a 'response' már a végleges, emberi válasz
             final_response = response
-            final_response.name = atom_id_for_request
-            final_response.additional_kwargs = {"timestamp": datetime.now(timezone.utc).isoformat()}
 
+            # === NÉV BEÁLLÍTÁSA ÉS NAPLÓBA MENTÉS ITT! ===
+            final_response.name = atom_id_for_request # Név beállítása
+            final_response.additional_kwargs = {"timestamp": datetime.now(timezone.utc).isoformat()} # Időbélyeg
+            firestore_history.add_message(final_response) # Mentés az SQLite naplóba
+            print(f"AI üzenet ({final_response.name}) elmentve a szekvenciális naplóba (SQLite).")
+            # ==========================================
+
+            # Most jöhet a darabolás és a vektoros mentés
             text_chunks = chunk_text(final_response.content)
             documents_to_add = []
             meeting_status = wrapped_get_meeting_status()
