@@ -14,6 +14,7 @@ from langchain_community.chat_message_histories.sql import SQLChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+from langchain_core.runnables import RunnableLambda
 
 # --- Saját modulok importálása ---
 # Most már szükségünk van az összes eszközre is!
@@ -102,11 +103,13 @@ class MessageBubble(ft.Row):
         bubble_color = getattr(ft.Colors, color_name, ft.Colors.BLACK)
 
         bubble_container = ft.Container(
-            content=ft.Markdown(
-                f"**{display_speaker}:** {message.content}" if display_speaker != "Te" else message.content,
-                selectable=True,
-                extension_set="gitHubWeb", # Ez egy robusztus, általános Markdown értelmező
-                code_theme="atom-one-dark" # Kódrészletekhez szép sötét téma
+            content=ft.SelectionArea( # <-- A kijelölhetőség kulcsa
+                content=ft.Markdown(
+                    f"**{display_speaker}:** {message.content}" if display_speaker != "Te" else message.content,
+                    selectable=True,
+                    extension_set="gitHubWeb", # Ez egy robusztus, általános Markdown értelmező
+                    code_theme="atom-one-dark" # Kódrészletekhez szép sötét téma
+                )
             ),
             padding=12, border_radius=ft.border_radius.all(15), expand=True,
         )
@@ -263,8 +266,20 @@ def main(page: ft.Page):
             ("human", "{input}"),
         ])
 
+        # --- METADATOK HOZZÁADÁSA A VÁLASZHOZ ---
+        # Ez a kis függvény veszi a modell válaszát (AIMessage) és hozzáadja
+        # a 'name' és 'timestamp' mezőket, MIELŐTT a history-ba kerülne.
+        def add_metadata_to_response(response_message: AIMessage):
+            response_message.name = selected_atom_id
+            response_message.additional_kwargs = {"timestamp": datetime.now(timezone.utc).isoformat()}
+            return response_message
+
+        # A lánc végére fűzzük a metadatokat hozzáadó függvényt
+        chain_with_metadata = prompt | llm_with_tools | RunnableLambda(add_metadata_to_response)
+
+
         chain_with_history = RunnableWithMessageHistory(
-            prompt | llm_with_tools,
+            chain_with_metadata,
             lambda session_id: firestore_history,
             input_messages_key="input",
             history_messages_key="history",
@@ -366,14 +381,10 @@ def main(page: ft.Page):
                 response = chain_for_request.invoke(current_input, config=config)
 
             # A ciklus végén a 'response' már a végleges, emberi válasz
+            # A 'name' és 'timestamp' mezőket a RunnableLambda már beállította.
             final_response = response
+            print(f"AI üzenet ({final_response.name}) a láncon keresztül automatikusan mentve (SQLite).")
 
-            # === NÉV BEÁLLÍTÁSA ÉS NAPLÓBA MENTÉS ITT! ===
-            final_response.name = atom_id_for_request # Név beállítása
-            final_response.additional_kwargs = {"timestamp": datetime.now(timezone.utc).isoformat()} # Időbélyeg
-            firestore_history.add_message(final_response) # Mentés az SQLite naplóba
-            print(f"AI üzenet ({final_response.name}) elmentve a szekvenciális naplóba (SQLite).")
-            # ==========================================
 
             # Most jöhet a darabolás és a vektoros mentés
             text_chunks = chunk_text(final_response.content)
