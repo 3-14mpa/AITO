@@ -121,7 +121,8 @@ class MessageBubble(ft.Row):
             bubble_container.bgcolor = ft.Colors.WHITE10
         else:
             self.alignment = ft.MainAxisAlignment.START
-            bubble_container.bgcolor = bubble_color
+            # Az eredeti színhez hozzáadunk egy kis áttetszőséget
+            bubble_container.bgcolor = ft.Colors.with_opacity(0.3, bubble_color) # <-- JAVÍTVA
         self.controls = [bubble_container]
 
 
@@ -274,7 +275,7 @@ def main(page: ft.Page):
             "wrapped_set_registry_value": wrapped_set_registry_value,
             "wrapped_get_registry_value": wrapped_get_registry_value,
             "wrapped_list_registry_keys": wrapped_list_registry_keys,
-            "wrapped_generate_diagram_tool": wrapped_generate_diagram_tool,
+            "wrapped_generate_diagram_tool": structured_diagram_tool,
             "wrapped_read_full_document_tool": wrapped_read_full_document_tool,
             "wrapped_set_meeting_status": wrapped_set_meeting_status,
             "wrapped_get_meeting_status": wrapped_get_meeting_status,
