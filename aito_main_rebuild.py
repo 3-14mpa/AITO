@@ -371,8 +371,8 @@ def main(page: ft.Page):
             # === NÉV BEÁLLÍTÁSA ÉS NAPLÓBA MENTÉS ITT! ===
             final_response.name = atom_id_for_request # Név beállítása
             final_response.additional_kwargs = {"timestamp": datetime.now(timezone.utc).isoformat()} # Időbélyeg
-            # firestore_history.add_message(final_response) # Mentés az SQLite naplóba
-            # print(f"AI üzenet ({final_response.name}) elmentve a szekvenciális naplóba (SQLite).")
+            firestore_history.add_message(final_response) # Mentés az SQLite naplóba
+            print(f"AI üzenet ({final_response.name}) elmentve a szekvenciális naplóba (SQLite).")
             # ==========================================
 
             # Most jöhet a darabolás és a vektoros mentés
