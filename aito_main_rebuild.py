@@ -196,8 +196,8 @@ def main(page: ft.Page):
         return search_memory_tool(query=query, config=CONFIG, vector_store=vector_store)
     def wrapped_search_knowledge_base_tool(query: str) -> str:
         return search_knowledge_base_tool(query=query, config=CONFIG, docs_vector_store=docs_vector_store)
-    def wrapped_list_uploaded_files_tool() -> str:
-        return list_uploaded_files_tool(config=CONFIG, docs_vector_store=docs_vector_store) # <- FIGYELEM: Ezt ki kellett egészítenem a docs_vector_store-ral
+    def wrapped_list_uploaded_files_tool(filter: str = "ALL") -> str:
+        return list_uploaded_files_tool(config=CONFIG, docs_vector_store=docs_vector_store, filter=filter)
     def wrapped_set_registry_value(key: str, value: str) -> str:
         return set_registry_value(key=key, value=value, config=CONFIG)
     def wrapped_get_registry_value(key: str) -> str:

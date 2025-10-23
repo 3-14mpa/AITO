@@ -143,24 +143,35 @@ def search_knowledge_base_tool(query: str, config: dict, docs_vector_store: Vect
     except Exception as e:
         return f"Hiba történt a tudásbázis keresése közben: {e}"
 
-def list_uploaded_files_tool(config: dict, docs_vector_store: VectorStore) -> str:
-    """Kilistázza a Tudásbázisba feltöltött összes dokumentum egyedi fájlnevét."""
-    print("--- ESZKÖZHÍVÁS: Feltöltött_Fájlok_Listázása ---")
+def list_uploaded_files_tool(config: dict, docs_vector_store: VectorStore, filter: str = "ALL") -> str:
+    """
+    Kilistázza a Tudásbázisba feltöltött dokumentumok neveit a megadott szűrő alapján.
+    A filter lehetséges értékei: "ALL", "SUMMARIES_ONLY", "DOCUMENTS_ONLY".
+    """
+    print(f"--- ESZKÖZHÍVÁS: Feltöltött_Fájlok_Listázása (Szűrő: {filter}) ---")
     try:
-        # ChromaDB-ben a dokumentumokat a get() metódussal tudjuk lekérni.
-        # A `where` feltétel nélküli get() az összes dokumentumot visszaadja.
         all_docs = docs_vector_store.get()
-
-        # A 'metadatas' listából kinyerjük a 'source_document' értékeket
         unique_files = set(
             metadata.get('source_document')
             for metadata in all_docs.get('metadatas', [])
             if metadata and metadata.get('source_document')
         )
 
-        if not unique_files:
-            return "A Tudásbázis jelenleg üres."
-        return "A Tudásbázisban a következő dokumentumok találhatók:\n- " + "\n- ".join(sorted(list(unique_files)))
+        if filter == "SUMMARIES_ONLY":
+            filtered_files = {f for f in unique_files if f.startswith("SUM_")}
+            if not filtered_files:
+                return "Nem található egyetlen összefoglaló sem a Tudásbázisban."
+            return "A Tudásbázisban a következő összefoglalók találhatók:\n- " + "\n- ".join(sorted(list(filtered_files)))
+        elif filter == "DOCUMENTS_ONLY":
+            filtered_files = {f for f in unique_files if not f.startswith("SUM_")}
+            if not filtered_files:
+                return "Nem található egyetlen eredeti dokumentum sem a Tudásbázisban."
+            return "A Tudásbázisban a következő eredeti dokumentumok találhatók:\n- " + "\n- ".join(sorted(list(filtered_files)))
+        else: # "ALL"
+            if not unique_files:
+                return "A Tudásbázis jelenleg üres."
+            return "A Tudásbázisban a következő dokumentumok és összefoglalók találhatók:\n- " + "\n- ".join(sorted(list(unique_files)))
+
     except Exception as e:
         return f"Hiba történt a fájlok listázása közben: {e}"
 
@@ -294,6 +305,23 @@ def read_full_document_tool(filename: str, docs_vector_store: VectorStore) -> st
         return f"Hiba történt a(z) '{filename}' dokumentum olvasása közben: {e}"
 
 print("Közös komponensek modul (shared_components.py) sikeresen betöltve.")
+
+def summarize_document(content: str) -> str:
+    """
+    Összefoglalja a dokumentum tartalmát a FLASH modell segítségével.
+    Jelenleg egy egyszerűsített, placeholder implementáció.
+    """
+    print("--- ESZKÖZHÍVÁS: Dokumentum Összefoglalása (Placeholder) ---")
+    # Ebben a placeholderben egyszerűen az első 3 sort vagy 500 karaktert adjuk vissza.
+    # A valódi implementáció itt egy LLM hívást tartalmazna.
+    summary_end_index = 500
+    summary = content[:summary_end_index]
+
+    # Ha a tartalom hosszabb, jelezzük, hogy ez csak egy részlet
+    if len(content) > summary_end_index:
+        summary += "..."
+
+    return f"A dokumentum rövid összefoglalója:\n{summary}"
 
 def read_agent_notebook(agent_id: str, config: dict) -> str:
     """Beolvassa egy adott ágens privát jegyzetfüzetének tartalmát."""
