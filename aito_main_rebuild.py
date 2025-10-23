@@ -110,7 +110,6 @@ class MessageBubble(ft.Row):
             content=ft.SelectionArea( # <-- A kijelölhetőség kulcsa
                 content=ft.Markdown(
                     f"**{display_speaker}:** {message.content}" if display_speaker != "Te" else message.content,
-                    selectable=True,
                     extension_set="gitHubWeb", # Ez egy robusztus, általános Markdown értelmező
                     code_theme="atom-one-dark" # Kódrészletekhez szép sötét téma
                 )
