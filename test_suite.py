@@ -98,7 +98,7 @@ class TestFileListingTool(unittest.TestCase):
         result = list_uploaded_files_tool(config={}, docs_vector_store=mock_docs_vector_store)
 
         # ASSERT
-        self.assertIn("A Tudásbázisban a következő dokumentumok találhatók:", result)
+        self.assertIn("A Tudásbázisban a következő dokumentumok és összefoglalók találhatók:", result)
         self.assertIn("- file_a.pdf", result)
         self.assertIn("- file_b.txt", result)
         self.assertEqual(result.count("file_a.pdf"), 1)
@@ -116,6 +116,48 @@ class TestFileListingTool(unittest.TestCase):
         # ASSERT
         self.assertEqual(result, "A Tudásbázis jelenleg üres.")
         print("\n'test_list_files_handles_empty_knowledge_base' ran successfully!")
+
+    def test_list_files_with_summaries_only_filter(self):
+        # ARRANGE
+        mock_docs_vector_store = MagicMock()
+        mock_docs_vector_store.get.return_value = {
+            'ids': ['1', '2', '3'],
+            'metadatas': [
+                {'source_document': 'file_a.pdf'},
+                {'source_document': 'SUM_file_a.pdf'},
+                {'source_document': 'file_b.txt'}
+            ]
+        }
+
+        # ACT
+        result = list_uploaded_files_tool(config={}, docs_vector_store=mock_docs_vector_store, filter="SUMMARIES_ONLY")
+
+        # ASSERT
+        self.assertIn("- SUM_file_a.pdf", result)
+        self.assertNotIn("- file_a.pdf", result)
+        self.assertNotIn("- file_b.txt", result)
+        print("\n'test_list_files_with_summaries_only_filter' ran successfully!")
+
+    def test_list_files_with_documents_only_filter(self):
+        # ARRANGE
+        mock_docs_vector_store = MagicMock()
+        mock_docs_vector_store.get.return_value = {
+            'ids': ['1', '2', '3'],
+            'metadatas': [
+                {'source_document': 'file_a.pdf'},
+                {'source_document': 'SUM_file_a.pdf'},
+                {'source_document': 'file_b.txt'}
+            ]
+        }
+
+        # ACT
+        result = list_uploaded_files_tool(config={}, docs_vector_store=mock_docs_vector_store, filter="DOCUMENTS_ONLY")
+
+        # ASSERT
+        self.assertNotIn("- SUM_file_a.pdf", result)
+        self.assertIn("- file_a.pdf", result)
+        self.assertIn("- file_b.txt", result)
+        print("\n'test_list_files_with_documents_only_filter' ran successfully!")
 
 
 class TestReadFullDocumentTool(unittest.TestCase):

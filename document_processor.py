@@ -6,7 +6,7 @@ import flet as ft
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage
-from shared_components import chunk_text
+from shared_components import chunk_text, summarize_document
 
 def create_document_chunk(content: str, source: str, chunk_num: int, total_chunks: int) -> Document:
     """Creates a LangChain Document object for a document chunk."""
@@ -107,7 +107,44 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict, p
         file_name = os.path.basename(filepath)
         if added_chunks_count == total_chunks_processed:
             print(f"--- '{file_name}' sikeresen feldolgozva: {added_chunks_count} darab mentve a memóriába. ---")
-            completion_message_content = f"'{file_name}' feldolgozása sikeresen befejeződött ({added_chunks_count} darab)."
+
+            # === ÖSSZEFOGLALÓ KÉSZÍTÉSE ÉS TÁROLÁSA ===
+            try:
+                print(f"Összefoglaló készítése a(z) '{file_name}' dokumentumhoz...")
+                summary_content = summarize_document(full_text)
+                summary_filename = f"SUM_{file_name}"
+
+                # Mentsük az összefoglalót egy külön fájlba is (opcionális, de jó gyakorlat)
+                summary_file_path = os.path.join(os.path.dirname(filepath), summary_filename)
+                with open(summary_file_path, "w", encoding="utf-8") as f:
+                    f.write(summary_content)
+                print(f"Összefoglaló sikeresen elmentve a(z) '{summary_file_path}' fájlba.")
+
+                # Töröljük a korábbi összefoglaló-darabokat is
+                summary_existing_ids = docs_vector_store.get(where={"source_document": summary_filename}).get("ids", [])
+                if summary_existing_ids:
+                    print(f"  {len(summary_existing_ids)} korábbi összefoglaló-darab törlése...")
+                    docs_vector_store.delete(ids=summary_existing_ids)
+
+                # Daraboljuk és tároljuk az összefoglalót a vektoradatbázisban
+                summary_chunks = chunk_text(summary_content)
+                for i, chunk in enumerate(summary_chunks):
+                    doc = create_document_chunk(
+                        content=chunk,
+                        source=summary_filename,
+                        chunk_num=i + 1,
+                        total_chunks=len(summary_chunks)
+                    )
+                    docs_vector_store.add_documents([doc])
+                print(f"Összefoglaló ({len(summary_chunks)} darab) sikeresen hozzáadva a tudásbázishoz '{summary_filename}' néven.")
+
+                completion_message_content = f"'{file_name}' feldolgozása és automatikus összefoglalása sikeresen befejeződött."
+
+            except Exception as summary_err:
+                print(f"!!! HIBA az összefoglaló készítése vagy tárolása közben: {summary_err}")
+                completion_message_content = f"'{file_name}' feldolgozása sikeres, de az automatikus összefoglalás hibára futott."
+            # =============================================
+
         else:
             print(f"--- '{file_name}' feldolgozása BEFEJEZVE HIBÁKKAL: {added_chunks_count}/{total_chunks_processed} darab mentve. Kérlek, ellenőrizd a naplót. ---")
             completion_message_content = f"'{file_name}' feldolgozása hibákkal fejeződött be ({added_chunks_count}/{total_chunks_processed} darab mentve)."
