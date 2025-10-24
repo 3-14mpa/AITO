@@ -82,7 +82,7 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict, p
                 total_chunks=total_chunks_processed
             )
             # === AZONNALI HOZZÁADÁS DARABONKÉNT, ÚJRAPRÓBÁLKOZÁSSAL ===
-            max_retries = 3
+            max_retries = 5
             added_successfully = False
             for attempt in range(max_retries + 1):
                 try:
@@ -137,7 +137,7 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict, p
                         total_chunks=len(summary_chunks)
                     )
                     # === AZONNALI HOZZÁADÁS DARABONKÉNT, ÚJRAPRÓBÁLKOZÁSSAL (ÖSSZEFOGLALÓHOZ) ===
-                    max_retries = 3
+                    max_retries = 5
                     for attempt in range(max_retries + 1):
                         try:
                             docs_vector_store.add_documents([doc])
