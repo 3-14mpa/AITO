@@ -224,7 +224,7 @@ def main(page: ft.Page):
         return update_agent_notebook(agent_id=active_atom, new_content=new_content, config=CONFIG)
 
     # === ÁLLAPOT ===
-    app_state = {"active_atom_id": INITIAL_ATOM_ID, "atom_chain": None, "tool_registry": {}}
+    app_state = {"active_atom_id": INITIAL_ATOM_ID, "atom_chain": None, "tool_registry": {}, "base_system_prompt": ""}
 
     # === AZ IGAZI `switch_atom` FÜGGVÉNY (main_aito.py-ból másolva) ===
     atom_buttons = {} # Ezt előre kell definiálni, hogy a switch_atom lássa
@@ -274,9 +274,10 @@ def main(page: ft.Page):
         llm_with_tools = llm.bind_tools(tools)
 
         app_state["tool_registry"] = tool_registry
+        app_state["base_system_prompt"] = final_system_prompt
 
         prompt = ChatPromptTemplate.from_messages([
-            ("system", final_system_prompt),
+            ("system", "{system_prompt}"),
             MessagesPlaceholder(variable_name="history"),
             ("human", "{input}"),
         ])
@@ -345,7 +346,18 @@ def main(page: ft.Page):
     def get_ai_response(user_message: HumanMessage, chain_for_request, atom_id_for_request: str, tool_registry: dict):
         try:
             config = {"configurable": {"session_id": CONFIG['session_id']}}
-            current_input = {"input": user_message.content, "active_atom_role": atom_id_for_request}
+
+            # --- Dinamikus Rendszerüzenet Összeállítása ---
+            current_time_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S %Z')
+            time_prompt_addition = f"Current timestamp: {current_time_str}\n\n"
+            final_system_prompt = time_prompt_addition + app_state["base_system_prompt"]
+
+            # A bemenet összeállítása a lánc számára
+            current_input = {
+                "input": user_message.content,
+                "active_atom_role": atom_id_for_request,
+                "system_prompt": final_system_prompt
+            }
             response = chain_for_request.invoke(current_input, config=config)
 
             while response.tool_calls:
@@ -365,7 +377,16 @@ def main(page: ft.Page):
                     tool_messages.append(ToolMessage(content=tool_output, tool_call_id=tool_call['id'], name=tool_name))
 
                 # A modell újrahívása az eszközök kimenetével
-                current_input = {"input": tool_messages, "active_atom_role": atom_id_for_request}
+                # A rendszerüzenet frissítése itt is megtörténik
+                current_time_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S %Z')
+                time_prompt_addition = f"Current timestamp: {current_time_str}\n\n"
+                final_system_prompt = time_prompt_addition + app_state["base_system_prompt"]
+
+                current_input = {
+                    "input": tool_messages,
+                    "active_atom_role": atom_id_for_request,
+                    "system_prompt": final_system_prompt
+                }
                 response = chain_for_request.invoke(current_input, config=config)
 
             # Ha a ciklus lefutott (vagy nem is volt benne tool_calls), a `response` a végleges szöveges válasz.
