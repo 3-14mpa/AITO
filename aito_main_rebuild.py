@@ -351,7 +351,7 @@ def main(page: ft.Page):
             time_prompt_addition = f"Current timestamp: {current_time_str}\n\n"
 
             # Az eredeti system prompt lekérése a láncból
-            original_system_prompt = app_state["atom_chain"].runnable.steps[0].messages[0].prompt.template
+            original_system_prompt = app_state["atom_chain"].bound.steps[0].messages[0].prompt.template
 
             # Új system prompt összeállítása az időbélyeggel
             new_system_prompt = time_prompt_addition + original_system_prompt
@@ -364,8 +364,8 @@ def main(page: ft.Page):
             ])
 
             # A lánc többi részének megtartása
-            llm_with_tools = app_state["atom_chain"].runnable.steps[1]
-            add_metadata_step = app_state["atom_chain"].runnable.steps[2]
+            llm_with_tools = app_state["atom_chain"].bound.steps[1]
+            add_metadata_step = app_state["atom_chain"].bound.steps[2]
 
             # Az új, ideiglenes lánc
             temp_chain = updated_prompt | llm_with_tools | add_metadata_step
