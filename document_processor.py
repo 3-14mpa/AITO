@@ -111,7 +111,7 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict, p
             # === ÖSSZEFOGLALÓ KÉSZÍTÉSE ÉS TÁROLÁSA ===
             try:
                 print(f"Összefoglaló készítése a(z) '{file_name}' dokumentumhoz...")
-                summary_content = summarize_document(full_text)
+                summary_content = summarize_document(full_text, config)
                 summary_filename = f"SUM_{file_name}"
 
                 # Mentsük az összefoglalót egy külön fájlba is (opcionális, de jó gyakorlat)
