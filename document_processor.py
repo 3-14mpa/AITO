@@ -128,6 +128,7 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict, p
 
                 # Daraboljuk és tároljuk az összefoglalót a vektoradatbázisban
                 summary_chunks = chunk_text(summary_content)
+                summary_chunks_added = 0
                 for i, chunk in enumerate(summary_chunks):
                     doc = create_document_chunk(
                         content=chunk,
@@ -135,10 +136,31 @@ def process_and_store_document(filepath: str, docs_vector_store, config: dict, p
                         chunk_num=i + 1,
                         total_chunks=len(summary_chunks)
                     )
-                    docs_vector_store.add_documents([doc])
-                print(f"Összefoglaló ({len(summary_chunks)} darab) sikeresen hozzáadva a tudásbázishoz '{summary_filename}' néven.")
+                    # === AZONNALI HOZZÁADÁS DARABONKÉNT, ÚJRAPRÓBÁLKOZÁSSAL (ÖSSZEFOGLALÓHOZ) ===
+                    max_retries = 3
+                    for attempt in range(max_retries + 1):
+                        try:
+                            docs_vector_store.add_documents([doc])
+                            print(f"  Összefoglaló darab #{i + 1}/{len(summary_chunks)} sikeresen hozzáadva.")
+                            summary_chunks_added += 1
+                            time.sleep(5)  # API hívások közötti szünet
+                            break  # Sikeres hozzáadás után kilépünk a ciklusból
+                        except Exception as add_err:
+                            is_quota_error = "429" in str(add_err) or "RESOURCE_EXHAUSTED" in str(add_err)
+                            if is_quota_error and attempt < max_retries:
+                                wait_time = (attempt + 1) * 5
+                                print(f"!!! KVÓTA HIBA az összefoglaló darabnál. Várakozás {wait_time} mp...")
+                                time.sleep(wait_time)
+                            else:
+                                print(f"!!! VÉGLEGES HIBA az összefoglaló darab hozzáadása közben: {add_err}")
+                                break # A darab kimarad
 
-                completion_message_content = f"'{file_name}' feldolgozása és automatikus összefoglalása sikeresen befejeződött."
+                print(f"Összefoglaló ({summary_chunks_added}/{len(summary_chunks)} darab) sikeresen hozzáadva a tudásbázishoz '{summary_filename}' néven.")
+
+                if summary_chunks_added == len(summary_chunks):
+                    completion_message_content = f"'{file_name}' feldolgozása és automatikus összefoglalása sikeresen befejeződött."
+                else:
+                    completion_message_content = f"'{file_name}' feldolgozása sikeres, de az összefoglaló mentése közben hibák léptek fel."
 
             except Exception as summary_err:
                 print(f"!!! HIBA az összefoglaló készítése vagy tárolása közben: {summary_err}")
