@@ -10,6 +10,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.vectorstores import VectorStore
 from langchain_chroma import Chroma
 from langchain_community.chat_message_histories.sql import SQLChatMessageHistory
+from langchain_google_vertexai import ChatVertexAI
 import sqlite3
 import base64
 
@@ -306,22 +307,44 @@ def read_full_document_tool(filename: str, docs_vector_store: VectorStore) -> st
 
 print("Közös komponensek modul (shared_components.py) sikeresen betöltve.")
 
-def summarize_document(content: str) -> str:
+def summarize_document(content: str, config: dict) -> str:
     """
-    Összefoglalja a dokumentum tartalmát a FLASH modell segítségével.
-    Jelenleg egy egyszerűsített, placeholder implementáció.
+    Összefoglalja a megadott szöveges tartalmát a Google Vertex AI 'gemini-2.0-flash-001' modelljével.
     """
-    print("--- ESZKÖZHÍVÁS: Dokumentum Összefoglalása (Placeholder) ---")
-    # Ebben a placeholderben egyszerűen az első 3 sort vagy 500 karaktert adjuk vissza.
-    # A valódi implementáció itt egy LLM hívást tartalmazna.
-    summary_end_index = 500
-    summary = content[:summary_end_index]
+    print("--- ESZKÖZHÍVÁS: Dokumentum Összefoglalása a Gemini Flash modellel ---")
+    try:
+        # A modell inicializálása kifejezetten ehhez a feladathoz
+        # A konfigurációt most már argumentumként kapja meg
+        model_name = "gemini-2.0-flash-001"
+        llm = ChatVertexAI(
+            model_name=model_name,
+            project=config['project_id'],
+            location=config['conversation_location'],
+            temperature=0.3,  # Kreativitás csökkentése a tényszerűbb összefoglalóért
+            top_p=0.95,
+        )
+        print(f"Vertex AI '{model_name}' modell sikeresen inicializálva az összefoglaláshoz.")
 
-    # Ha a tartalom hosszabb, jelezzük, hogy ez csak egy részlet
-    if len(content) > summary_end_index:
-        summary += "..."
+        # A prompt összeállítása a prompts.yaml alapján
+        summary_prompt_template = PROMPTS.get('document_summary_prompt', "Készíts egy részletes, több bekezdésből álló összefoglalót a következő dokumentumról magyarul:\n\n{document_content}")
 
-    return f"A dokumentum rövid összefoglalója:\n{summary}"
+        # A teljes prompt összeállítása
+        prompt_content = summary_prompt_template.format(document_content=content)
+
+        # A modell meghívása
+        messages = [HumanMessage(content=prompt_content)]
+        response = llm.invoke(messages)
+
+        summary_text = response.content
+        print("Összefoglaló sikeresen legenerálva.")
+
+        return summary_text
+
+    except Exception as e:
+        print(f"!!! HIBA az összefoglaló készítése közben: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Hiba történt az összefoglalás során: {e}"
 
 def read_agent_notebook(agent_id: str, config: dict) -> str:
     """Beolvassa egy adott ágens privát jegyzetfüzetének tartalmát."""
