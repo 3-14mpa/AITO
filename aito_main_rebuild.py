@@ -345,8 +345,33 @@ def main(page: ft.Page):
     def get_ai_response(user_message: HumanMessage, chain_for_request, atom_id_for_request: str, tool_registry: dict):
         try:
             config = {"configurable": {"session_id": CONFIG['session_id']}}
+
+            # Időbélyeg hozzáadása a rendszerprompthoz
+            current_time_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S %Z')
+            time_prompt_addition = f"Current timestamp: {current_time_str}\n\n"
+
+            # Az eredeti system prompt lekérése a láncból
+            original_system_prompt = app_state["atom_chain"].runnable.steps[0].messages[0].prompt.template
+
+            # Új system prompt összeállítása az időbélyeggel
+            new_system_prompt = time_prompt_addition + original_system_prompt
+
+            # A lánc frissítése az új prompttal (csak erre a hívásra)
+            updated_prompt = ChatPromptTemplate.from_messages([
+                ("system", new_system_prompt),
+                MessagesPlaceholder(variable_name="history"),
+                ("human", "{input}"),
+            ])
+
+            # A lánc többi részének megtartása
+            llm_with_tools = app_state["atom_chain"].runnable.steps[1]
+            add_metadata_step = app_state["atom_chain"].runnable.steps[2]
+
+            # Az új, ideiglenes lánc
+            temp_chain = updated_prompt | llm_with_tools | add_metadata_step
+
             current_input = {"input": user_message.content, "active_atom_role": atom_id_for_request}
-            response = chain_for_request.invoke(current_input, config=config)
+            response = temp_chain.invoke(current_input, config=config)
 
             while response.tool_calls:
                 tool_messages = []
@@ -366,7 +391,7 @@ def main(page: ft.Page):
 
                 # A modell újrahívása az eszközök kimenetével
                 current_input = {"input": tool_messages, "active_atom_role": atom_id_for_request}
-                response = chain_for_request.invoke(current_input, config=config)
+                response = temp_chain.invoke(current_input, config=config)
 
             # Ha a ciklus lefutott (vagy nem is volt benne tool_calls), a `response` a végleges szöveges válasz.
             final_response = response
