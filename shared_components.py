@@ -110,7 +110,27 @@ def search_memory_tool(query: str, config: dict, vector_store: VectorStore) -> s
         for msg in full_conversation_messages:
             speaker = getattr(msg, 'name', 'Ismeretlen')
             display_speaker = "Te" if speaker == config.get('user_id', 'user') else speaker
-            formatted_context += f"{display_speaker}: {msg.content}\n"
+
+            # Metaadatok kinyerése
+            timestamp_str = msg.additional_kwargs.get("timestamp", "unknown_time")
+            try:
+                # Próbáljuk meg szépen formázni az időt (csak a dátumot és órát/percet)
+                dt = datetime.fromisoformat(timestamp_str).strftime('%Y-%m-%d %H:%M')
+            except:
+                dt = "N/A" # Ha az időbélyeg formátuma nem stimmel
+
+            # A meeting_id kinyerése (ez az aito_main_rebuild.py-ból jön)
+            meeting_id = msg.additional_kwargs.get("meeting_id")
+
+            # Metaadat sor összeállítása
+            meta_prefix = f"[{dt}"
+            if meeting_id:
+                meta_prefix += f" | M:{meeting_id}"
+            meta_prefix += "]"
+
+            # Formázott sor hozzáadása
+            formatted_context += f"{meta_prefix} {display_speaker}: {msg.content}\n"
+        # ========================
 
         # 4. FÁZIS: Végső válasz összeállítása
         response = f"A keresés a '{most_common_session_id}' azonosítójú beszélgetést találta a legrelevánsabbnak. A teljes rekonstruált beszélgetés:\n\n---\n{formatted_context.strip()}\n---"
