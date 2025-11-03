@@ -148,6 +148,11 @@ def main(page: ft.Page):
 
     page.title = "AITO Vezérlőpult"
     page.theme_mode = ft.ThemeMode.DARK
+    page.theme = ft.Theme(
+        text_theme=ft.TextTheme(
+            body_medium=ft.TextStyle(size=16)
+        )
+    )
 
     print(f"{time.monotonic():.4f}: --- STARTING INITIALIZATION ---")
 
@@ -347,14 +352,25 @@ def main(page: ft.Page):
         try:
             config = {"configurable": {"session_id": CONFIG['session_id']}}
 
-            # --- Dinamikus Rendszerüzenet Összeállítása ---
+            # === DINAMIKUS RENDSZERÜZENET ÖSSZEÁLLÍTÁSA ===
+            # Aktuális idő lekérdezése
             current_time_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S %Z')
-            time_prompt_addition = f"Current timestamp: {current_time_str}\n\n"
-            final_system_prompt = time_prompt_addition + app_state["base_system_prompt"]
+            time_prompt_addition = f"Current Timestamp: {current_time_str}\n"
 
-            # A bemenet összeállítása a lánc számára
+            # Aktuális megbeszélés állapotának lekérdezése (ez egy gyors, helyi DB hívás)
+            meeting_status = wrapped_get_meeting_status()
+            meeting_id_str = "None (INACTIVE)"
+            if meeting_status.get('is_active'):
+                meeting_id_str = f"{meeting_status.get('meeting_id')} (ACTIVE)"
+            status_prompt_addition = f"Current Meeting ID: {meeting_id_str}\n\n" # Két sortörés a jobb tagolásért
+
+            # A végleges prompt összeállítása
+            final_system_prompt = time_prompt_addition + status_prompt_addition + app_state["base_system_prompt"]
+            # ============================================
+
+            # A bemenet összeállítása a lánc számára (ez a sor már létezik, csak ellenőrizd)
             current_input = {
-                "input": user_message.content,
+                "input": user_message.content, # vagy 'tool_messages' a ciklusban
                 "active_atom_role": atom_id_for_request,
                 "system_prompt": final_system_prompt
             }
@@ -378,12 +394,23 @@ def main(page: ft.Page):
 
                 # A modell újrahívása az eszközök kimenetével
                 # A rendszerüzenet frissítése itt is megtörténik
+                # === DINAMIKUS RENDSZERÜZENET ÖSSZEÁLLÍTÁSA ===
+                # Aktuális idő lekérdezése
                 current_time_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S %Z')
-                time_prompt_addition = f"Current timestamp: {current_time_str}\n\n"
-                final_system_prompt = time_prompt_addition + app_state["base_system_prompt"]
+                time_prompt_addition = f"Current Timestamp: {current_time_str}\n"
 
+                # Aktuális megbeszélés állapotának lekérdezése (ez egy gyors, helyi DB hívás)
+                meeting_status = wrapped_get_meeting_status()
+                meeting_id_str = "None (INACTIVE)"
+                if meeting_status.get('is_active'):
+                    meeting_id_str = f"{meeting_status.get('meeting_id')} (ACTIVE)"
+                status_prompt_addition = f"Current Meeting ID: {meeting_id_str}\n\n" # Két sortörés a jobb tagolásért
+
+                # A végleges prompt összeállítása
+                final_system_prompt = time_prompt_addition + status_prompt_addition + app_state["base_system_prompt"]
+                # ============================================
                 current_input = {
-                    "input": tool_messages,
+                    "input": tool_messages, # vagy 'tool_messages' a ciklusban
                     "active_atom_role": atom_id_for_request,
                     "system_prompt": final_system_prompt
                 }
