@@ -148,6 +148,11 @@ def main(page: ft.Page):
 
     page.title = "AITO Vezérlőpult"
     page.theme_mode = ft.ThemeMode.DARK
+    page.theme = ft.Theme(
+        text_theme=ft.TextTheme(
+            body_medium=ft.TextStyle(size=16)
+        )
+    )
 
     print(f"{time.monotonic():.4f}: --- STARTING INITIALIZATION ---")
 
